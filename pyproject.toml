@@ -1,0 +1,17 @@
+[project]
+name = "salesforce-agent"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "DS Gen AI Platform Team"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "google-adk (>=1.7.0,<2.0.0)",
+    "google-cloud-aiplatform (>=1.104.0,<2.0.0)",
+    "litellm",
+    "a2a-sdk>=0.3.0"
+]
+
+
