@@ -16,7 +16,7 @@ from a2a.server.tasks import TaskStore
 from a2a.types import AgentCard
 
 from .agent_card import AgentCardBuilder
-from ..auth.oauth_middleware import OAuthMiddleware
+from auth.oauth_middleware import OAuthMiddleware
 
 logger = logging.getLogger(__name__)
 

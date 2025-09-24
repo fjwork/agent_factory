@@ -15,7 +15,7 @@ from a2a.types import (
     AgentProvider
 )
 
-from ..auth.auth_config import load_auth_config, get_security_schemes
+from auth.auth_config import load_auth_config, get_security_schemes
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +105,8 @@ class AgentCardBuilder:
         provider = None
         if card_config.provider_name:
             provider = AgentProvider(
-                name=card_config.provider_name,
-                url=card_config.provider_url
+                organization=card_config.provider_name,
+                url=card_config.provider_url or "https://example.com"
             )
 
         # Get security schemes from auth config

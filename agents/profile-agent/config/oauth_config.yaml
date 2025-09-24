@@ -11,7 +11,7 @@ oauth:
 
   # Token storage and lifecycle
   token_storage:
-    type: "${TOKEN_STORAGE_TYPE:secret_manager}"  # memory, file, secret_manager
+    type: "${TOKEN_STORAGE_TYPE:file}"  # memory, file, secret_manager
     encryption: true
     ttl_seconds: "${TOKEN_TTL:3600}"
 
