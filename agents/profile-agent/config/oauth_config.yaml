@@ -1,0 +1,150 @@
+# OAuth IDP Configuration Template
+# This file defines OAuth settings for different identity providers
+
+oauth:
+  # Default provider configuration
+  default_provider: "${OAUTH_DEFAULT_PROVIDER:google}"
+
+  # OAuth flow settings
+  flow_type: "${OAUTH_FLOW_TYPE:device_flow}"  # device_flow, authorization_code, client_credentials
+  scopes: "${OAUTH_SCOPES:openid profile email}"
+
+  # Token storage and lifecycle
+  token_storage:
+    type: "${TOKEN_STORAGE_TYPE:secret_manager}"  # memory, file, secret_manager
+    encryption: true
+    ttl_seconds: "${TOKEN_TTL:3600}"
+
+  # Security settings
+  security:
+    validate_issuer: true
+    validate_audience: true
+    require_https: "${OAUTH_REQUIRE_HTTPS:true}"
+    token_introspection: "${OAUTH_TOKEN_INTROSPECTION:false}"
+
+# Provider-specific configurations
+providers:
+  google:
+    # OAuth 2.0 configuration
+    client_id: "${GOOGLE_OAUTH_CLIENT_ID}"
+    client_secret: "${GOOGLE_OAUTH_CLIENT_SECRET}"
+
+    # Endpoints
+    authorization_url: "https://accounts.google.com/o/oauth2/auth"
+    token_url: "https://oauth2.googleapis.com/token"
+    device_authorization_url: "https://oauth2.googleapis.com/device/code"
+    userinfo_url: "https://www.googleapis.com/oauth2/v3/userinfo"
+    jwks_url: "https://www.googleapis.com/oauth2/v3/certs"
+
+    # Default scopes
+    default_scopes:
+      - "openid"
+      - "https://www.googleapis.com/auth/userinfo.profile"
+      - "https://www.googleapis.com/auth/userinfo.email"
+
+    # Google-specific settings
+    hosted_domain: "${GOOGLE_HOSTED_DOMAIN:}"
+    include_granted_scopes: true
+
+  azure:
+    # Azure AD configuration
+    client_id: "${AZURE_OAUTH_CLIENT_ID}"
+    client_secret: "${AZURE_OAUTH_CLIENT_SECRET}"
+    tenant_id: "${AZURE_TENANT_ID}"
+
+    # Endpoints
+    authorization_url: "https://login.microsoftonline.com/${AZURE_TENANT_ID}/oauth2/v2.0/authorize"
+    token_url: "https://login.microsoftonline.com/${AZURE_TENANT_ID}/oauth2/v2.0/token"
+    device_authorization_url: "https://login.microsoftonline.com/${AZURE_TENANT_ID}/oauth2/v2.0/devicecode"
+    userinfo_url: "https://graph.microsoft.com/v1.0/me"
+
+    # Default scopes
+    default_scopes:
+      - "openid"
+      - "profile"
+      - "email"
+      - "User.Read"
+
+  okta:
+    # Okta configuration
+    client_id: "${OKTA_OAUTH_CLIENT_ID}"
+    client_secret: "${OKTA_OAUTH_CLIENT_SECRET}"
+    domain: "${OKTA_DOMAIN}"
+
+    # Endpoints
+    authorization_url: "https://${OKTA_DOMAIN}/oauth2/default/v1/authorize"
+    token_url: "https://${OKTA_DOMAIN}/oauth2/default/v1/token"
+    device_authorization_url: "https://${OKTA_DOMAIN}/oauth2/default/v1/device/authorize"
+    userinfo_url: "https://${OKTA_DOMAIN}/oauth2/default/v1/userinfo"
+    jwks_url: "https://${OKTA_DOMAIN}/oauth2/default/v1/keys"
+
+    # Default scopes
+    default_scopes:
+      - "openid"
+      - "profile"
+      - "email"
+
+  custom:
+    # Custom IDP configuration
+    client_id: "${CUSTOM_OAUTH_CLIENT_ID}"
+    client_secret: "${CUSTOM_OAUTH_CLIENT_SECRET}"
+
+    # Custom endpoints
+    authorization_url: "${CUSTOM_AUTHORIZATION_URL}"
+    token_url: "${CUSTOM_TOKEN_URL}"
+    device_authorization_url: "${CUSTOM_DEVICE_AUTH_URL}"
+    userinfo_url: "${CUSTOM_USERINFO_URL}"
+    jwks_url: "${CUSTOM_JWKS_URL}"
+
+    # Custom scopes
+    default_scopes: "${CUSTOM_DEFAULT_SCOPES:openid profile email}"
+
+# A2A Authentication Configuration
+a2a_auth:
+  # Security schemes for the A2A agent card
+  security_schemes:
+    oauth2:
+      type: "oauth2"
+      description: "OAuth 2.0 authentication"
+      flows:
+        authorizationCode:
+          authorizationUrl: "${A2A_OAUTH_AUTH_URL}"
+          tokenUrl: "${A2A_OAUTH_TOKEN_URL}"
+          scopes:
+            agent_access: "Access to agent functionalities"
+
+    bearerAuth:
+      type: "http"
+      scheme: "bearer"
+      bearerFormat: "JWT"
+      description: "Bearer token authentication"
+
+    apiKey:
+      type: "apiKey"
+      in: "header"
+      name: "X-API-Key"
+      description: "API key authentication"
+
+  # Required security for the agent
+  security:
+    - oauth2: ["agent_access"]
+    - bearerAuth: []
+
+# Environment-specific overrides
+environments:
+  development:
+    oauth:
+      require_https: false
+    security:
+      validate_issuer: false
+
+  staging:
+    oauth:
+      require_https: true
+
+  production:
+    oauth:
+      require_https: true
+    security:
+      validate_issuer: true
+      validate_audience: true
