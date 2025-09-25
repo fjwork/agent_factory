@@ -6,6 +6,7 @@ This module provides a base class for creating tools that require user authentic
 
 import time
 import logging
+import httpx
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -101,6 +102,43 @@ class AuthenticatedTool(ABC):
             log_data["details"] = details
 
         logger.info(f"Tool execution: {log_data}")
+
+    async def fetch_real_user_info(self, user_context: Dict[str, Any]) -> Dict[str, Any]:
+        """Fetch real user information from OAuth provider API."""
+        access_token = self.get_access_token(user_context)
+        provider = self.get_provider(user_context)
+
+        if not access_token:
+            logger.warning("No access token available, using cached user info")
+            return self.get_user_info(user_context)
+
+        try:
+            if provider == "google":
+                return await self._fetch_google_user_info(access_token)
+            else:
+                logger.warning(f"Unsupported provider '{provider}', using cached user info")
+                return self.get_user_info(user_context)
+
+        except Exception as e:
+            logger.warning(f"Failed to fetch real user info from {provider}: {e}, using cached data")
+            return self.get_user_info(user_context)
+
+    async def _fetch_google_user_info(self, access_token: str) -> Dict[str, Any]:
+        """Fetch user information from Google UserInfo API."""
+        url = "https://www.googleapis.com/oauth2/v2/userinfo"
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, timeout=10.0)
+
+            if response.status_code == 200:
+                user_data = response.json()
+                logger.info(f"Successfully fetched real user info from Google for: {user_data.get('email', 'unknown')}")
+                return user_data
+            else:
+                error_msg = f"Google UserInfo API failed: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                raise ToolExecutionError(error_msg)
 
 
 class AuthenticationError(Exception):

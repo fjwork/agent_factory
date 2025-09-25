@@ -60,8 +60,56 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
             # Add user context to request
             request.state.user_context = user_context
 
-            # Call parent handler
-            return await super().handle_post(request)
+            # Store OAuth context in ADK session state
+            await self._store_oauth_context_in_session(user_context)
+
+            # Parse the JSON-RPC request to determine which method to call
+            body = await request.body()
+            if body:
+                import json
+                from a2a.types import MessageSendParams
+                from a2a.server.context import ServerCallContext
+
+                data = json.loads(body)
+                method = data.get("method")
+
+                if method == "message/send":
+                    # Extract params and create MessageSendParams object
+                    params_data = data.get("params", {})
+                    message_params = MessageSendParams.model_validate(params_data)
+
+                    # Create server context
+                    context = ServerCallContext(request=request)
+
+                    # Call the parent method with correct parameters
+                    result = await self.on_message_send(message_params, context)
+
+                    # Return JSON-RPC response
+                    return JSONResponse({
+                        "jsonrpc": "2.0",
+                        "id": data.get("id"),
+                        "result": result.model_dump() if hasattr(result, 'model_dump') else result
+                    })
+
+                elif method == "message/send_stream":
+                    # Handle streaming if needed
+                    params_data = data.get("params", {})
+                    message_params = MessageSendParams.model_validate(params_data)
+                    context = ServerCallContext(request=request)
+
+                    # This would need to handle streaming response
+                    async_gen = self.on_message_send_stream(message_params, context)
+                    # For now, return error as streaming needs special handling
+                    return JSONResponse(
+                        {"error": "Streaming not implemented yet"},
+                        status_code=501
+                    )
+
+            # Default fallback
+            return JSONResponse(
+                {"error": "Unsupported method"},
+                status_code=400
+            )
 
         except Exception as e:
             logger.error(f"Authentication error in POST handler: {e}")
@@ -294,3 +342,55 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
             status_code=401,
             headers={"WWW-Authenticate": www_auth_header}
         )
+
+    async def _store_oauth_context_in_session(self, user_context: Dict[str, Any]) -> None:
+        """Store OAuth context in ADK session state for tools to access."""
+        try:
+            # Get user ID from context
+            user_id = user_context.get("user_id")
+            if not user_id:
+                logger.warning("No user_id in user context, cannot store in session")
+                return
+
+            # Get session service from agent executor
+            session_service = self.agent_executor.runner.session_service
+            app_name = self.agent_executor.runner.app_name
+
+            # Generate session ID based on user ID (for consistency)
+            session_id = f"session_{user_id.replace('@', '_').replace('.', '_')}"
+
+            # Check if session exists, create if not
+            try:
+                session = await session_service.get_session(
+                    app_name=app_name,
+                    user_id=user_id,
+                    session_id=session_id
+                )
+            except Exception:
+                # Session doesn't exist, create it
+                session = await session_service.create_session(
+                    app_name=app_name,
+                    user_id=user_id,
+                    session_id=session_id,
+                    state={}
+                )
+
+            # Store OAuth context in session state
+            oauth_state = {
+                "oauth_user_id": user_context.get("user_id"),
+                "oauth_provider": user_context.get("provider"),
+                "oauth_user_info": user_context.get("user_info", {}),
+                "oauth_token": user_context.get("token") or user_context.get("access_token"),
+                "oauth_authenticated": True,
+                "oauth_last_updated": logger.handlers[0].formatter.formatTime(logging.LogRecord("", 0, "", 0, "", (), None)) if logger.handlers else "unknown"
+            }
+
+            # Update session state
+            session.state.update(oauth_state)
+            await session_service.save_session(session)
+
+            logger.info(f"Stored OAuth context in ADK session for user: {user_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to store OAuth context in session: {e}")
+            # Don't fail the request if session storage fails

@@ -54,9 +54,9 @@ def create_profile_agent() -> Agent:
     profile_tool = ProfileTool()
     profile_summary_tool = ProfileSummaryTool()
 
-    # Convert to FunctionTool for ADK
-    profile_function_tool = FunctionTool(profile_tool.execute_authenticated)
-    summary_function_tool = FunctionTool(profile_summary_tool.execute_authenticated)
+    # Convert to FunctionTool for ADK - tools will access user context from session state
+    profile_function_tool = FunctionTool(profile_tool.execute_with_context)
+    summary_function_tool = FunctionTool(profile_summary_tool.execute_with_context)
 
     # Create agent
     agent = Agent(

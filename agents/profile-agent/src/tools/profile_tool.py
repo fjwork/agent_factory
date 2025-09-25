@@ -6,6 +6,7 @@ This tool specifically handles user profile requests and information retrieval.
 
 import logging
 from typing import Dict, Any, Optional, List
+from google.adk.tools import ToolContext
 from .authenticated_tool import AuthenticatedTool, AuthenticationError, ToolExecutionError
 
 logger = logging.getLogger(__name__)
@@ -47,8 +48,8 @@ class ProfileTool(AuthenticatedTool):
         )
 
         try:
-            # Extract user information from OAuth context
-            user_info = self.get_user_info(user_context)
+            # Get real user information from OAuth provider API
+            user_info = await self.fetch_real_user_info(user_context)
             user_id = self.get_user_id(user_context)
             provider = self.get_provider(user_context)
 
@@ -161,6 +162,54 @@ class ProfileTool(AuthenticatedTool):
 
         return summary
 
+    async def execute_with_context(
+        self,
+        tool_context: ToolContext,
+        request_type: str = "full_profile",
+        specific_fields: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Execute profile tool using ADK ToolContext for user authentication.
+
+        Args:
+            tool_context: ADK ToolContext with session state
+            request_type: Type of profile request (full_profile, basic_info, email_only)
+            specific_fields: Specific profile fields to retrieve
+
+        Returns:
+            Formatted profile information
+        """
+        # Get user context from session state
+        user_context = {
+            "user_id": tool_context.state.get("oauth_user_id"),
+            "provider": tool_context.state.get("oauth_provider"),
+            "user_info": tool_context.state.get("oauth_user_info", {}),
+            "token": tool_context.state.get("oauth_token")
+        }
+
+        # Validate that user is authenticated
+        if not user_context["user_id"] or not user_context["token"]:
+            return {
+                "success": False,
+                "error": "User authentication required. Please authenticate first.",
+                "auth_required": True
+            }
+
+        # Call the existing authenticated method
+        try:
+            return await self.execute_authenticated(user_context, request_type, specific_fields)
+        except AuthenticationError as e:
+            return {
+                "success": False,
+                "error": f"Authentication failed: {str(e)}",
+                "auth_required": True
+            }
+        except ToolExecutionError as e:
+            return {
+                "success": False,
+                "error": f"Profile retrieval failed: {str(e)}"
+            }
+
 
 class ProfileSummaryTool(AuthenticatedTool):
     """Tool for generating profile summaries and insights."""
@@ -196,7 +245,7 @@ class ProfileSummaryTool(AuthenticatedTool):
         )
 
         try:
-            user_info = self.get_user_info(user_context)
+            user_info = await self.fetch_real_user_info(user_context)
             user_id = self.get_user_id(user_context)
             provider = self.get_provider(user_context)
 
@@ -267,3 +316,49 @@ class ProfileSummaryTool(AuthenticatedTool):
         name = user_info.get("name", "Unknown")
         email = user_info.get("email", "No email")
         return f"{name} ({email})"
+
+    async def execute_with_context(
+        self,
+        tool_context: ToolContext,
+        summary_style: str = "friendly"
+    ) -> Dict[str, Any]:
+        """
+        Execute profile summary tool using ADK ToolContext for user authentication.
+
+        Args:
+            tool_context: ADK ToolContext with session state
+            summary_style: Style of summary (friendly, formal, brief)
+
+        Returns:
+            Formatted profile summary
+        """
+        # Get user context from session state
+        user_context = {
+            "user_id": tool_context.state.get("oauth_user_id"),
+            "provider": tool_context.state.get("oauth_provider"),
+            "user_info": tool_context.state.get("oauth_user_info", {}),
+            "token": tool_context.state.get("oauth_token")
+        }
+
+        # Validate that user is authenticated
+        if not user_context["user_id"] or not user_context["token"]:
+            return {
+                "success": False,
+                "error": "User authentication required. Please authenticate first.",
+                "auth_required": True
+            }
+
+        # Call the existing authenticated method
+        try:
+            return await self.execute_authenticated(user_context, summary_style)
+        except AuthenticationError as e:
+            return {
+                "success": False,
+                "error": f"Authentication failed: {str(e)}",
+                "auth_required": True
+            }
+        except ToolExecutionError as e:
+            return {
+                "success": False,
+                "error": f"Profile summary generation failed: {str(e)}"
+            }
