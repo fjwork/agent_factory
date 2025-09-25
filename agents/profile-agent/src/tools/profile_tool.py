@@ -199,12 +199,29 @@ class ProfileTool(AuthenticatedTool):
                 # Find any authenticated user (in practice there should be only one at a time)
                 for user_id, oauth_context in registry.items():
                     if oauth_context.get("oauth_authenticated"):
-                        user_context = oauth_context
+                        # Normalize the context to ensure compatibility
+                        user_context = {
+                            "user_id": oauth_context.get("oauth_user_id"),
+                            "oauth_user_id": oauth_context.get("oauth_user_id"),
+                            "provider": oauth_context.get("oauth_provider"),
+                            "oauth_provider": oauth_context.get("oauth_provider"),
+                            "user_info": oauth_context.get("oauth_user_info", {}),
+                            "oauth_user_info": oauth_context.get("oauth_user_info", {}),
+                            "token": oauth_context.get("oauth_token"),
+                            "oauth_token": oauth_context.get("oauth_token"),
+                            "oauth_authenticated": True
+                        }
                         logger.info(f"Using OAuth context from global registry for user: {user_id}")
                         break
 
         # Validate that user is authenticated
-        if not user_context.get("oauth_user_id") or not user_context.get("oauth_token"):
+        # Check both session state format and global registry format
+        user_id = user_context.get("oauth_user_id") or user_context.get("user_id")
+        token = user_context.get("oauth_token") or user_context.get("token")
+
+        if not user_id or not token:
+            logger.warning(f"Authentication validation failed. user_context keys: {list(user_context.keys())}")
+            logger.warning(f"user_id: {user_id}, token: {'present' if token else 'missing'}")
             return {
                 "success": False,
                 "error": "User authentication required. Please authenticate first.",
@@ -368,12 +385,29 @@ class ProfileSummaryTool(AuthenticatedTool):
                 # Find any authenticated user (in practice there should be only one at a time)
                 for user_id, oauth_context in registry.items():
                     if oauth_context.get("oauth_authenticated"):
-                        user_context = oauth_context
+                        # Normalize the context to ensure compatibility
+                        user_context = {
+                            "user_id": oauth_context.get("oauth_user_id"),
+                            "oauth_user_id": oauth_context.get("oauth_user_id"),
+                            "provider": oauth_context.get("oauth_provider"),
+                            "oauth_provider": oauth_context.get("oauth_provider"),
+                            "user_info": oauth_context.get("oauth_user_info", {}),
+                            "oauth_user_info": oauth_context.get("oauth_user_info", {}),
+                            "token": oauth_context.get("oauth_token"),
+                            "oauth_token": oauth_context.get("oauth_token"),
+                            "oauth_authenticated": True
+                        }
                         logger.info(f"Using OAuth context from global registry for user: {user_id}")
                         break
 
         # Validate that user is authenticated
-        if not user_context.get("oauth_user_id") or not user_context.get("oauth_token"):
+        # Check both session state format and global registry format
+        user_id = user_context.get("oauth_user_id") or user_context.get("user_id")
+        token = user_context.get("oauth_token") or user_context.get("token")
+
+        if not user_id or not token:
+            logger.warning(f"Authentication validation failed. user_context keys: {list(user_context.keys())}")
+            logger.warning(f"user_id: {user_id}, token: {'present' if token else 'missing'}")
             return {
                 "success": False,
                 "error": "User authentication required. Please authenticate first.",

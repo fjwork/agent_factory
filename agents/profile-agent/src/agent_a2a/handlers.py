@@ -238,7 +238,8 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
                 return {
                     "user_id": user_id,
                     "provider": token.provider,
-                    "user_info": user_info
+                    "user_info": user_info,
+                    "token": token
                 }
 
         return None
@@ -440,11 +441,20 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
             if not user_id:
                 return
 
+            # Debug: Log what's actually in user_context
+            logger.info(f"Debug: user_context keys: {list(user_context.keys())}")
+            logger.info(f"Debug: user_context content: {user_context}")
+
+            # Get the actual token - it might be stored differently
+            token = (user_context.get("token") or
+                    user_context.get("access_token") or
+                    user_context.get("oauth_token"))
+
             oauth_context = {
                 "oauth_user_id": user_context.get("user_id"),
                 "oauth_provider": user_context.get("provider"),
                 "oauth_user_info": user_context.get("user_info", {}),
-                "oauth_token": user_context.get("token") or user_context.get("access_token"),
+                "oauth_token": token,
                 "oauth_authenticated": True
             }
 
