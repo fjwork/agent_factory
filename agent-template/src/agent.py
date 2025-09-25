@@ -18,7 +18,7 @@ from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 
 from auth.auth_config import load_auth_config
-from a2a.server import create_authenticated_a2a_server
+from agent_a2a.server import create_authenticated_a2a_server
 from tools.authenticated_tool import AuthenticatedTool
 
 # Configure logging
@@ -77,8 +77,8 @@ def create_example_agent() -> Agent:
     # Create authenticated tool
     example_tool = ExampleAuthenticatedTool(name="example_authenticated_tool")
 
-    # Convert to FunctionTool for ADK
-    example_function_tool = FunctionTool(example_tool.execute_authenticated)
+    # Convert to FunctionTool for ADK - use execute_with_context for session state integration
+    example_function_tool = FunctionTool(example_tool.execute_with_context)
 
     # Create agent
     agent = Agent(

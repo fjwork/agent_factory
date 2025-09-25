@@ -5,6 +5,7 @@ This module provides request handlers with OAuth authentication integration.
 """
 
 import logging
+import time
 from typing import Dict, Any, Optional
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
@@ -23,6 +24,9 @@ logger = logging.getLogger(__name__)
 
 class AuthenticatedRequestHandler(DefaultRequestHandler):
     """Request handler with OAuth authentication."""
+
+    # Global OAuth context registry for fallback access
+    _oauth_registry: Dict[str, Dict[str, Any]] = {}
 
     def __init__(
         self,
@@ -59,6 +63,13 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
 
             # Add user context to request
             request.state.user_context = user_context
+
+            # Store OAuth context in session state for tool access
+            body = await request.body()
+            await self._store_oauth_in_session_state(user_context, body)
+
+            # Store OAuth context in global registry as fallback
+            await self._store_oauth_in_global_registry(user_context)
 
             # Call parent handler
             return await super().handle_post(request)
@@ -189,7 +200,8 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
                 return {
                     "user_id": user_id,
                     "provider": token.provider,
-                    "user_info": user_info
+                    "user_info": user_info,
+                    "token": token
                 }
 
         return None
@@ -279,6 +291,63 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
             pass
 
         return None
+
+    async def _store_oauth_in_session_state(self, user_context: Dict[str, Any], body: bytes) -> None:
+        """Store OAuth context in ADK session state for tool access."""
+        try:
+            # Parse the request body to extract session information
+            import json
+            request_data = json.loads(body.decode()) if body else {}
+
+            # Get session ID from the request
+            session_id = request_data.get("session_id")
+
+            if not session_id:
+                logger.warning("No session_id found in request body, cannot store OAuth in session state")
+                return
+
+            # Store OAuth context in session state via the agent executor
+            if hasattr(self.agent_executor, 'update_session_state'):
+                oauth_context = {
+                    "oauth_user_id": user_context.get("user_id"),
+                    "oauth_provider": user_context.get("provider"),
+                    "oauth_user_info": user_context.get("user_info", {}),
+                    "oauth_token": user_context.get("token"),
+                    "oauth_authenticated": True
+                }
+
+                await self.agent_executor.update_session_state(session_id, oauth_context)
+                logger.info(f"Stored OAuth context in session state for user {user_context.get('user_id')}")
+            else:
+                logger.warning("Agent executor does not support update_session_state, falling back to global registry only")
+
+        except Exception as e:
+            logger.error(f"Failed to store OAuth context in session state: {e}")
+            # Continue execution - global registry will be used as fallback
+
+    async def _store_oauth_in_global_registry(self, user_context: Dict[str, Any]) -> None:
+        """Store OAuth context in global registry as fallback mechanism."""
+        try:
+            user_id = user_context.get("user_id")
+            if not user_id:
+                logger.warning("No user_id in context, cannot store in global registry")
+                return
+
+            oauth_context = {
+                "oauth_user_id": user_id,
+                "oauth_provider": user_context.get("provider"),
+                "oauth_user_info": user_context.get("user_info", {}),
+                "oauth_token": user_context.get("token"),
+                "oauth_authenticated": True,
+                "timestamp": time.time()
+            }
+
+            # Store in class-level registry
+            AuthenticatedRequestHandler._oauth_registry[user_id] = oauth_context
+            logger.info(f"Stored OAuth context in global registry for user {user_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to store OAuth context in global registry: {e}")
 
     def _create_auth_required_response(self, schemes: list = None) -> Response:
         """Create a response indicating authentication is required."""

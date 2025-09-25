@@ -17,18 +17,20 @@ A comprehensive template for building Google ADK (Agent Development Kit) agents 
 ```
 agent-template/
 ├── src/
-│   ├── auth/                     # Authentication components
-│   │   ├── auth_config.py        # Configuration management
-│   │   ├── oauth_middleware.py   # OAuth flow implementation
-│   │   └── credential_store.py   # Secure token storage
-│   ├── a2a/                      # A2A protocol components
-│   │   ├── agent_card.py         # Agent card generation
-│   │   ├── server.py             # A2A server implementation
-│   │   └── handlers.py           # Authenticated request handlers
-│   ├── tools/                    # Agent tools
-│   │   ├── authenticated_tool.py # Base authenticated tool class
-│   │   └── examples/             # Example tools
-│   └── agent.py                  # Main agent implementation
+│   ├── auth/                         # Authentication components
+│   │   ├── auth_config.py            # Configuration management
+│   │   ├── oauth_middleware.py       # OAuth flow implementation
+│   │   └── credential_store.py       # Secure token storage
+│   ├── agent_a2a/                    # A2A protocol components
+│   │   ├── agent_card.py             # Agent card generation
+│   │   ├── server.py                 # A2A server implementation
+│   │   └── handlers.py               # Authenticated request handlers
+│   ├── tools/                        # Agent tools
+│   │   ├── authenticated_tool.py     # Base authenticated tool class
+│   │   └── examples/                 # Example tool implementations
+│   │       ├── profile_example_tool.py  # Profile retrieval example
+│   │       └── api_example_tool.py      # API integration example
+│   └── agent.py                      # Main agent implementation
 ├── config/                       # Configuration files
 │   ├── agent_config.yaml         # Agent settings
 │   ├── oauth_config.yaml         # OAuth provider settings
@@ -38,6 +40,7 @@ agent-template/
 │   ├── agent_engine/            # Agent Engine deployment
 │   ├── docker/                  # Container configuration
 │   └── scripts/                 # Setup and utility scripts
+├── oauth_test_client.py          # OAuth flow test client
 └── docs/                        # Documentation
 ```
 
@@ -248,9 +251,36 @@ cp .env.example .env
 python src/agent.py
 ```
 
-### Testing Authentication
+### Testing OAuth Authentication
 
-Use the provided endpoints to test OAuth flows:
+#### Using the Test Client (Recommended)
+
+The template includes a comprehensive test client for validating OAuth flows:
+
+```bash
+# Run complete test suite
+python oauth_test_client.py --user-id test@example.com
+
+# Test specific components
+python oauth_test_client.py --test oauth --user-id test@example.com
+python oauth_test_client.py --test tools --user-id test@example.com
+python oauth_test_client.py --test health
+
+# Test with different agent URL
+python oauth_test_client.py --agent-url http://localhost:8001 --user-id test@example.com
+
+# Enable verbose logging
+python oauth_test_client.py --verbose --user-id test@example.com
+```
+
+The test client will:
+1. Check initial authentication status
+2. Initiate OAuth flow if needed
+3. Guide you through browser authentication
+4. Test authenticated tool execution
+5. Validate all endpoints
+
+#### Manual Testing with curl
 
 ```bash
 # Initiate authentication
@@ -263,9 +293,8 @@ curl "http://localhost:8000/auth/status?user_id=test-user"
 
 # Test agent with authentication
 curl -X POST http://localhost:8000/ \
-  -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"user_id": "test-user", "message": "Hello!"}'
+  -d '{"user_id": "test-user", "session_id": "test-session", "message": "Hello!"}'
 ```
 
 ## 📖 API Documentation
@@ -305,12 +334,46 @@ This template is provided under the Apache 2.0 License. See LICENSE file for det
 - **Issues**: Report issues on the project repository
 - **Examples**: Check `src/tools/examples/` for implementation examples
 
+## 🔧 Key Features & Improvements
+
+This template provides a **production-ready** foundation for OAuth-authenticated agents with several critical improvements:
+
+### ✅ **Fixed OAuth Integration**
+- **Critical Bug Fix**: OAuth tokens now properly included in user context
+- **Session State Storage**: OAuth context stored in ADK session state for tool access
+- **Fallback Registry**: Global OAuth registry for robust context access
+- **Real API Integration**: Live calls to OAuth provider APIs (Google UserInfo, etc.)
+
+### 🛠️ **Enhanced Tool Development**
+- **Dual Execution Methods**: Both `execute_authenticated()` and `execute_with_context()`
+- **ADK Integration**: Proper `FunctionTool` registration with session state access
+- **Example Tools**: Ready-to-use profile and API integration examples
+- **Error Handling**: Comprehensive error handling and graceful degradation
+
+### 🔐 **Robust Authentication**
+- **Multiple Auth Schemes**: Bearer tokens, API keys, Basic auth, JWT validation
+- **Token Management**: Automatic refresh, secure storage, lifecycle management
+- **Provider Support**: Google, Azure, Okta, and custom OAuth providers
+- **Security**: HTTPS enforcement, token encryption, scope validation
+
+### 🧪 **Comprehensive Testing**
+- **Test Client**: Complete OAuth flow validation tool (`oauth_test_client.py`)
+- **End-to-End Testing**: Automated testing of all authentication flows
+- **Debug Support**: Detailed logging and troubleshooting capabilities
+
+### 📊 **Developer Experience**
+- **Clear Documentation**: Step-by-step setup and usage instructions
+- **Example Implementations**: Profile and API tools as templates
+- **Configuration Management**: Environment-specific settings and overrides
+- **Deployment Ready**: Cloud Run and Agent Engine deployment scripts
+
 ## 🔄 Migration from Existing Agents
 
 To migrate an existing ADK agent to use this template:
 
 1. Copy your agent logic to `src/agent.py`
-2. Update configuration files with your settings
-3. Add authentication to your tools using the provided base classes
-4. Update deployment scripts with your specific requirements
-5. Test authentication flows in development environment
+2. Update tool registration to use `tool.execute_with_context` instead of `tool.execute_authenticated`
+3. Inherit from `AuthenticatedTool` and implement `execute_authenticated()` method
+4. Update configuration files with your OAuth settings
+5. Test authentication flows using the provided test client
+6. Update deployment scripts with your specific requirements
