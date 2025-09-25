@@ -187,8 +187,24 @@ class ProfileTool(AuthenticatedTool):
             "token": tool_context.state.get("oauth_token")
         }
 
-        # Validate that user is authenticated
+        # If session state doesn't have OAuth context, try global registry fallback
         if not user_context["user_id"] or not user_context["token"]:
+            # Import here to avoid circular imports
+            from agent_a2a.handlers import AuthenticatedRequestHandler
+
+            # Check if there's OAuth context in the global registry
+            # This is a fallback for cases where session state setup failed
+            if hasattr(AuthenticatedRequestHandler, '_oauth_registry'):
+                registry = AuthenticatedRequestHandler._oauth_registry
+                # Find any authenticated user (in practice there should be only one at a time)
+                for user_id, oauth_context in registry.items():
+                    if oauth_context.get("oauth_authenticated"):
+                        user_context = oauth_context
+                        logger.info(f"Using OAuth context from global registry for user: {user_id}")
+                        break
+
+        # Validate that user is authenticated
+        if not user_context.get("oauth_user_id") or not user_context.get("oauth_token"):
             return {
                 "success": False,
                 "error": "User authentication required. Please authenticate first.",
@@ -340,8 +356,24 @@ class ProfileSummaryTool(AuthenticatedTool):
             "token": tool_context.state.get("oauth_token")
         }
 
-        # Validate that user is authenticated
+        # If session state doesn't have OAuth context, try global registry fallback
         if not user_context["user_id"] or not user_context["token"]:
+            # Import here to avoid circular imports
+            from agent_a2a.handlers import AuthenticatedRequestHandler
+
+            # Check if there's OAuth context in the global registry
+            # This is a fallback for cases where session state setup failed
+            if hasattr(AuthenticatedRequestHandler, '_oauth_registry'):
+                registry = AuthenticatedRequestHandler._oauth_registry
+                # Find any authenticated user (in practice there should be only one at a time)
+                for user_id, oauth_context in registry.items():
+                    if oauth_context.get("oauth_authenticated"):
+                        user_context = oauth_context
+                        logger.info(f"Using OAuth context from global registry for user: {user_id}")
+                        break
+
+        # Validate that user is authenticated
+        if not user_context.get("oauth_user_id") or not user_context.get("oauth_token"):
             return {
                 "success": False,
                 "error": "User authentication required. Please authenticate first.",

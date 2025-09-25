@@ -29,11 +29,13 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
         agent_executor: AgentExecutor,
         task_store: TaskStore,
         oauth_middleware: OAuthMiddleware,
-        card_builder: AgentCardBuilder
+        card_builder: AgentCardBuilder,
+        runner=None
     ):
         super().__init__(agent_executor, task_store)
         self.oauth_middleware = oauth_middleware
         self.card_builder = card_builder
+        self.runner = runner
 
     async def handle_post(self, request: Request) -> Response:
         """Handle A2A POST requests with authentication."""
@@ -60,12 +62,11 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
             # Add user context to request
             request.state.user_context = user_context
 
-            # Store OAuth context in ADK session state
-            await self._store_oauth_context_in_session(user_context)
-
             # Parse the JSON-RPC request to determine which method to call
             body = await request.body()
             if body:
+                # Store OAuth context in ADK session state with parsed body
+                await self._store_oauth_in_session_state(user_context, body)
                 import json
                 from a2a.types import MessageSendParams
                 from a2a.server.context import ServerCallContext
@@ -343,54 +344,123 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
             headers={"WWW-Authenticate": www_auth_header}
         )
 
-    async def _store_oauth_context_in_session(self, user_context: Dict[str, Any]) -> None:
+    async def _store_oauth_in_session_state(self, user_context: Dict[str, Any], body: bytes) -> None:
         """Store OAuth context in ADK session state for tools to access."""
         try:
-            # Get user ID from context
             user_id = user_context.get("user_id")
             if not user_id:
-                logger.warning("No user_id in user context, cannot store in session")
+                logger.warning("No user_id in user context, cannot store OAuth context")
                 return
 
-            # Get session service from agent executor
-            session_service = self.agent_executor.runner.session_service
-            app_name = self.agent_executor.runner.app_name
+            # Parse the JSON-RPC request to get session information
+            if not body:
+                logger.warning("No request body, cannot determine session")
+                return
 
-            # Generate session ID based on user ID (for consistency)
-            session_id = f"session_{user_id.replace('@', '_').replace('.', '_')}"
+            import json
+            data = json.loads(body)
+            params_data = data.get("params", {})
 
-            # Check if session exists, create if not
-            try:
-                session = await session_service.get_session(
-                    app_name=app_name,
-                    user_id=user_id,
-                    session_id=session_id
-                )
-            except Exception:
-                # Session doesn't exist, create it
-                session = await session_service.create_session(
-                    app_name=app_name,
-                    user_id=user_id,
-                    session_id=session_id,
-                    state={}
-                )
+            # Extract session info from the A2A request
+            # ADK will create a session with the user_id from the A2A message
+            message_params = params_data.get("message", {})
+            context_id = params_data.get("context_id")
 
-            # Store OAuth context in session state
-            oauth_state = {
+            # Get the session service from the runner
+            if not self.runner:
+                logger.warning("No runner available, cannot access session service")
+                return
+
+            session_service = self.runner.session_service
+
+            # For A2A requests, ADK typically creates a user_id like "A2A_USER_<context_id>"
+            # We need to store OAuth context in the session that will be used
+            if context_id:
+                # Try to create/get session with the context_id as user_id
+                adk_user_id = f"A2A_USER_{context_id}"
+                app_name = self.runner.app_name
+
+                try:
+                    # Try to get existing session or create new one
+                    session = await session_service.get_session(
+                        app_name=app_name,
+                        user_id=adk_user_id,
+                        session_id=context_id
+                    )
+
+                    if not session:
+                        # Create a new session with OAuth context in state
+                        oauth_state = {
+                            "oauth_user_id": user_context.get("user_id"),
+                            "oauth_provider": user_context.get("provider"),
+                            "oauth_user_info": user_context.get("user_info", {}),
+                            "oauth_token": user_context.get("token") or user_context.get("access_token"),
+                            "oauth_authenticated": True
+                        }
+
+                        session = await session_service.create_session(
+                            app_name=app_name,
+                            user_id=adk_user_id,
+                            session_id=context_id,
+                            state=oauth_state
+                        )
+                        logger.info(f"Created new session with OAuth context for user: {adk_user_id}")
+                    else:
+                        # Update existing session with OAuth context
+                        oauth_state = {
+                            "oauth_user_id": user_context.get("user_id"),
+                            "oauth_provider": user_context.get("provider"),
+                            "oauth_user_info": user_context.get("user_info", {}),
+                            "oauth_token": user_context.get("token") or user_context.get("access_token"),
+                            "oauth_authenticated": True
+                        }
+
+                        # Update session state
+                        session.state.update(oauth_state)
+                        await session_service.save_session(session)
+                        logger.info(f"Updated session with OAuth context for user: {adk_user_id}")
+
+                except Exception as e:
+                    logger.error(f"Failed to create/update session: {e}")
+                    # Fallback to global registry
+                    await self._store_oauth_in_global_registry(user_context)
+            else:
+                logger.warning("No context_id in request, using global registry fallback")
+                await self._store_oauth_in_global_registry(user_context)
+
+        except Exception as e:
+            logger.error(f"Failed to store OAuth context in session: {e}")
+            # Fallback to global registry
+            await self._store_oauth_in_global_registry(user_context)
+
+    async def _store_oauth_in_global_registry(self, user_context: Dict[str, Any]) -> None:
+        """Fallback method to store OAuth context in global registry."""
+        try:
+            user_id = user_context.get("user_id")
+            if not user_id:
+                return
+
+            oauth_context = {
                 "oauth_user_id": user_context.get("user_id"),
                 "oauth_provider": user_context.get("provider"),
                 "oauth_user_info": user_context.get("user_info", {}),
                 "oauth_token": user_context.get("token") or user_context.get("access_token"),
-                "oauth_authenticated": True,
-                "oauth_last_updated": logger.handlers[0].formatter.formatTime(logging.LogRecord("", 0, "", 0, "", (), None)) if logger.handlers else "unknown"
+                "oauth_authenticated": True
             }
 
-            # Update session state
-            session.state.update(oauth_state)
-            await session_service.save_session(session)
+            # Store in a module-level registry
+            if not hasattr(self.__class__, '_oauth_registry'):
+                self.__class__._oauth_registry = {}
 
-            logger.info(f"Stored OAuth context in ADK session for user: {user_id}")
+            self.__class__._oauth_registry[user_id] = oauth_context
+            logger.info(f"Stored OAuth context in global registry for user: {user_id}")
 
         except Exception as e:
-            logger.error(f"Failed to store OAuth context in session: {e}")
-            # Don't fail the request if session storage fails
+            logger.error(f"Failed to store OAuth context in global registry: {e}")
+
+    @classmethod
+    def get_oauth_context(cls, user_id: str) -> Dict[str, Any]:
+        """Get OAuth context for a user."""
+        if not hasattr(cls, '_oauth_registry'):
+            return {}
+        return cls._oauth_registry.get(user_id, {})

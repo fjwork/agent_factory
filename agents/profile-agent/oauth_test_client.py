@@ -91,9 +91,9 @@ class ProfileAgentClient:
         payload = {
             "jsonrpc": "2.0",
             "id": "request-1",
+            "user_id": user_id,  # Move user_id to root level for auth handler
             "method": "message/send",
             "params": {
-                "user_id": user_id,  # Include user_id for identification
                 "message": {
                     "role": "user",
                     "parts": [
@@ -129,7 +129,7 @@ async def main():
     print("=" * 50)
 
     client = ProfileAgentClient()
-    user_id = "test_user_123"
+    user_id = "flammoglia@google.com"  # Use real user email
 
     # Step 1: Check current auth status
     print("\n📋 Step 1: Checking current authentication status...")
