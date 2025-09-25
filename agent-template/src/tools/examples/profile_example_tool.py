@@ -7,7 +7,7 @@ using OAuth authentication. It serves as a template for building profile-related
 
 import logging
 from typing import Dict, Any, Optional, List
-from ..authenticated_tool import AuthenticatedTool, AuthenticationError, ToolExecutionError
+from tools.authenticated_tool import AuthenticatedTool, AuthenticationError, ToolExecutionError
 
 logger = logging.getLogger(__name__)
 

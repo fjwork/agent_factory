@@ -10,9 +10,14 @@ import asyncio
 import logging
 import uvicorn
 from typing import Dict, Any
+from dotenv import load_dotenv
 
-# Add current directory to path for imports
-sys.path.insert(0, os.path.dirname(__file__))
+# Load environment variables from .env file
+load_dotenv()
+
+# Add src directory to path for imports
+src_dir = os.path.dirname(__file__)
+sys.path.insert(0, src_dir)
 
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
@@ -145,13 +150,22 @@ def main():
             logger.info("🔧 Development mode: CORS enabled, detailed logging")
 
         # Run server
-        uvicorn.run(
-            app,
-            host=host,
-            port=port,
-            log_level=os.getenv("LOG_LEVEL", "info").lower(),
-            reload=environment == "development"
-        )
+        if environment == "development":
+            # For development, disable reload to avoid import issues
+            uvicorn.run(
+                app,
+                host=host,
+                port=port,
+                log_level=os.getenv("LOG_LEVEL", "info").lower(),
+                reload=False
+            )
+        else:
+            uvicorn.run(
+                app,
+                host=host,
+                port=port,
+                log_level=os.getenv("LOG_LEVEL", "info").lower()
+            )
 
     except Exception as e:
         logger.error(f"Failed to start agent: {e}")

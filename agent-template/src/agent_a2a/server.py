@@ -31,7 +31,7 @@ from a2a.utils.constants import AGENT_CARD_WELL_KNOWN_PATH
 
 from .agent_card import AgentCardBuilder
 from .handlers import AuthenticatedRequestHandler
-from ..auth.oauth_middleware import OAuthMiddleware
+from auth.oauth_middleware import OAuthMiddleware
 
 logger = logging.getLogger(__name__)
 

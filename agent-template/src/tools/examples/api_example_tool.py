@@ -7,7 +7,7 @@ using OAuth tokens. It serves as a template for building API integration tools.
 
 import logging
 from typing import Dict, Any, Optional
-from ..authenticated_tool import AuthenticatedTool, AuthenticationError, ToolExecutionError
+from tools.authenticated_tool import AuthenticatedTool, AuthenticationError, ToolExecutionError
 
 logger = logging.getLogger(__name__)
 

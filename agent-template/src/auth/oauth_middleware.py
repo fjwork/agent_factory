@@ -99,12 +99,12 @@ class OAuthMiddleware:
         return {
             "flow_type": "device_flow",
             "session_id": session_id,
-            "verification_url": auth_data["verification_uri"],
+            "verification_url": auth_data.get("verification_uri", auth_data.get("verification_url")),
             "verification_url_complete": auth_data.get("verification_uri_complete"),
             "user_code": auth_data["user_code"],
             "expires_in": auth_data.get("expires_in", 1800),
             "interval": auth_data.get("interval", 5),
-            "message": f"Go to {auth_data['verification_uri']} and enter code: {auth_data['user_code']}"
+            "message": f"Go to {auth_data.get('verification_uri', auth_data.get('verification_url'))} and enter code: {auth_data['user_code']}"
         }
 
     async def _initiate_authorization_code_flow(self, user_id: str, provider: OAuthProvider) -> Dict[str, Any]:
