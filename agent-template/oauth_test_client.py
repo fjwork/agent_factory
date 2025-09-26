@@ -125,10 +125,10 @@ class AgentTestClient:
 async def main():
     """Main OAuth flow demonstration"""
 
-    print("🚀 Profile Agent OAuth Test Client")
+    print("🚀 Agent Template OAuth Test Client")
     print("=" * 50)
 
-    client = ProfileAgentClient()
+    client = AgentTestClient()
     user_id = "flammoglia@google.com"  # Use real user email
 
     # Step 1: Check current auth status
