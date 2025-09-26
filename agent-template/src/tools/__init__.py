@@ -1,1 +1,1 @@
-# Tools module for authenticated tools
+"""Authenticated tools for ADK agents."""

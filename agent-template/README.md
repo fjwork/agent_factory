@@ -1,379 +1,412 @@
-# ADK Agent Template with OAuth Authentication
+# Agent Template - OAuth-Authenticated AI Agent
 
-A comprehensive template for building Google ADK (Agent Development Kit) agents with OAuth authentication and A2A (Agent-to-Agent) protocol integration.
+A **production-ready** template for building Google ADK (Agent Development Kit) agents with OAuth authentication and A2A (Agent-to-Agent) protocol integration.
 
-## 🚀 Features
+## 🎯 Overview
 
-- **OAuth Integration**: Support for multiple OAuth providers (Google, Azure, Okta, custom)
-- **Multiple OAuth Flows**: Device Flow, Authorization Code, Client Credentials
-- **Secure Token Storage**: Memory, file-based, or Google Cloud Secret Manager
-- **A2A Protocol**: Full Agent-to-Agent protocol implementation with authentication
-- **Dual Deployment**: Support for both Cloud Run and Vertex AI Agent Engine
-- **Environment Configuration**: Environment-specific settings and overrides
-- **Security**: Proper authentication, authorization, and credential management
+This template provides a complete foundation for creating OAuth-authenticated AI agents with enterprise-grade security and real API integration. Built on Google ADK with working OAuth flows and authentication patterns proven in production.
+
+**Status**: ✅ **PRODUCTION READY** - Full OAuth flows working end-to-end with live API integration.
+
+## ✨ Key Features
+
+- **🔐 Complete OAuth Integration**: Device Flow, Authorization Code, and Client Credentials flows
+- **🌐 Multi-Provider Support**: Google, Azure AD, Okta, and custom identity providers
+- **🛡️ Enterprise Security**: Token encryption, HTTPS enforcement, JWT validation
+- **📡 A2A Protocol**: Full Agent-to-Agent protocol with authentication
+- **🤖 Google ADK Integration**: Native Gemini model integration with tool execution
+- **📊 Real API Integration**: Live data from OAuth provider APIs
+- **🔄 Token Management**: Automatic refresh, secure storage, lifecycle management
+- **📋 Template Structure**: Easy to customize for your specific agent needs
+
+## 🏗️ Template Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  Your Custom Agent                         │
+│                   (Built from Template)                    │
+│                                                             │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐  │
+│  │   Agent Core    │  │  OAuth System   │  │ A2A Server  │  │
+│  │  (agent.py)     │  │ (auth/*)        │  │(agent_a2a/*) │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────┘  │
+│           │                     │                   │       │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐  │
+│  │ Custom Tools    │  │ Token Storage   │  │  HTTP API   │  │
+│  │ (tools/*)       │  │(credential_*)   │  │  Handlers   │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ## 📁 Project Structure
 
 ```
 agent-template/
 ├── src/
-│   ├── auth/                         # Authentication components
-│   │   ├── auth_config.py            # Configuration management
-│   │   ├── oauth_middleware.py       # OAuth flow implementation
-│   │   └── credential_store.py       # Secure token storage
-│   ├── agent_a2a/                    # A2A protocol components
-│   │   ├── agent_card.py             # Agent card generation
-│   │   ├── server.py                 # A2A server implementation
-│   │   └── handlers.py               # Authenticated request handlers
-│   ├── tools/                        # Agent tools
-│   │   ├── authenticated_tool.py     # Base authenticated tool class
-│   │   └── examples/                 # Example tool implementations
-│   │       ├── profile_example_tool.py  # Profile retrieval example
-│   │       └── api_example_tool.py      # API integration example
-│   └── agent.py                      # Main agent implementation
-├── config/                       # Configuration files
-│   ├── agent_config.yaml         # Agent settings
-│   ├── oauth_config.yaml         # OAuth provider settings
-│   └── deployment_config.yaml    # Deployment configuration
-├── deployment/                   # Deployment scripts and configs
-│   ├── cloud_run/               # Cloud Run deployment
-│   ├── agent_engine/            # Agent Engine deployment
-│   ├── docker/                  # Container configuration
-│   └── scripts/                 # Setup and utility scripts
-├── oauth_test_client.py          # OAuth flow test client
-└── docs/                        # Documentation
+│   ├── agent.py                          # Main entry point - create_agent()
+│   ├── auth/                             # OAuth authentication system
+│   │   ├── oauth_middleware.py           # OAuthMiddleware class
+│   │   ├── credential_store.py           # Token storage (Memory/File/SecretManager)
+│   │   └── auth_config.py               # Configuration management
+│   ├── agent_a2a/                       # A2A protocol implementation
+│   │   ├── server.py                    # AuthenticatedA2AServer class
+│   │   ├── handlers.py                  # AuthenticatedRequestHandler class
+│   │   └── agent_card.py               # AgentCardBuilder class
+│   └── tools/                           # Agent tools
+│       ├── authenticated_tool.py        # AuthenticatedTool base class
+│       ├── example_tool.py             # ExampleTool implementation
+│       └── examples/                   # Additional example tools
+├── config/                              # Configuration files
+│   ├── agent_config.yaml              # Agent settings and capabilities
+│   └── oauth_config.yaml              # OAuth provider configuration
+├── oauth_test_client.py                # OAuth test client
+└── README.md                           # This file
 ```
 
-## 🛠 Quick Start
+## 🚀 Quick Start
 
-### 1. Initial Setup
-
-Run the setup script to configure your environment:
+### 1. Prerequisites
 
 ```bash
-# Basic setup
-./deployment/scripts/setup.sh
+# Install Python 3.11+ and dependencies
+pip install -r requirements.txt
 
-# Development setup (includes dev dependencies)
-./deployment/scripts/setup.sh --dev
-
-# Specify project and location
-./deployment/scripts/setup.sh --project YOUR_PROJECT_ID --location us-central1
+# Set up Google Cloud Authentication
+gcloud auth application-default login
+export GOOGLE_CLOUD_PROJECT="your-project-id"
 ```
 
-### 2. Configure OAuth
+### 2. OAuth Configuration
 
-1. Go to [Google Cloud Console > APIs & Services > Credentials](https://console.cloud.google.com/apis/credentials)
-2. Create an OAuth 2.0 Client ID for a Desktop application
-3. Set environment variables or store in Secret Manager:
+#### Google OAuth Setup
+1. Go to [Google Cloud Console > Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create OAuth 2.0 Client ID (Desktop application)
+3. Configure environment variables in `.env`:
 
 ```bash
-export GOOGLE_OAUTH_CLIENT_ID="your-client-id"
-export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
+# Update these values in .env
+GOOGLE_OAUTH_CLIENT_ID="your-client-id"
+GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
+GOOGLE_CLOUD_PROJECT="your-project-id"
 ```
 
-### 3. Customize Configuration
+### 3. Customize Your Agent
 
-Edit the configuration files in the `config/` directory:
-
-- `agent_config.yaml` - Agent behavior and capabilities
-- `oauth_config.yaml` - OAuth providers and settings
-- `deployment_config.yaml` - Deployment parameters
-
-### 4. Deploy
-
-#### Deploy to Cloud Run:
-```bash
-python deployment/cloud_run/deploy.py --environment production
-```
-
-#### Deploy to Agent Engine:
-```bash
-python deployment/agent_engine/deploy.py --action create --environment production
-```
-
-## 🔧 Configuration
-
-### Agent Configuration (`config/agent_config.yaml`)
-
+#### Step 1: Update Agent Configuration
+Edit `config/agent_config.yaml`:
 ```yaml
 agent:
-  name: "${AGENT_NAME:MyAgent}"
-  version: "${AGENT_VERSION:1.0.0}"
-  description: "${AGENT_DESCRIPTION:A configurable ADK agent with OAuth authentication}"
-
-  model:
-    provider: "${MODEL_PROVIDER:gemini}"
-    name: "${MODEL_NAME:gemini-2.0-flash}"
-    use_vertex_ai: "${USE_VERTEX_AI:true}"
-
-  capabilities:
-    streaming: true
-    authenticated_extended_card: true
+  name: "YourAgentName"
+  description: "Description of your agent's purpose"
 
 skills:
-  - id: "authenticated_api_call"
-    name: "Authenticated API Call"
-    description: "Makes authenticated API calls using user credentials"
-    tags: ["api", "authentication", "secure"]
+  - id: "your_skill"
+    name: "Your Skill Name"
+    description: "What your agent can do"
+    examples:
+      - "Example request 1"
+      - "Example request 2"
 ```
 
-### OAuth Configuration (`config/oauth_config.yaml`)
+#### Step 2: Create Your Custom Tools
+Replace `src/tools/example_tool.py` with your custom tools:
 
+```python
+from .authenticated_tool import AuthenticatedTool
+
+class YourCustomTool(AuthenticatedTool):
+    def __init__(self):
+        super().__init__(
+            name="your_tool",
+            description="Your tool description"
+        )
+
+    async def execute_authenticated(self, user_context, **kwargs):
+        # Your tool logic here
+        user_info = await self.fetch_real_user_info(user_context)
+        # Process and return results
+        return {"success": True, "data": "your_results"}
+```
+
+#### Step 3: Update Agent Instructions
+Edit `src/agent.py` function `create_agent()`:
+```python
+instruction=f"""
+You are {agent_name}, specialized in [YOUR DOMAIN].
+
+Your capabilities:
+- [Capability 1]
+- [Capability 2]
+- [Capability 3]
+
+Available tools:
+- your_tool: [Description]
+"""
+```
+
+### 4. Run Your Agent
+
+```bash
+# Start your customized agent
+cd src
+python agent.py
+
+# Agent starts on http://localhost:8001
+# Agent card: http://localhost:8001/.well-known/agent-card.json
+```
+
+### 5. Test OAuth Flow
+
+```bash
+# Run the OAuth test client
+python oauth_test_client.py
+
+# Follow the device flow instructions:
+# 1. Visit the provided Google URL
+# 2. Enter the device code
+# 3. Authorize the application
+# 4. Test your custom tools
+```
+
+## 🔧 Customization Guide
+
+### Adding New OAuth Providers
+
+1. **Update OAuth Config** (`config/oauth_config.yaml`):
 ```yaml
-oauth:
-  default_provider: "${OAUTH_DEFAULT_PROVIDER:google}"
-  flow_type: "${OAUTH_FLOW_TYPE:device_flow}"
-  scopes: "${OAUTH_SCOPES:openid profile email}"
-
 providers:
-  google:
-    client_id: "${GOOGLE_OAUTH_CLIENT_ID}"
-    client_secret: "${GOOGLE_OAUTH_CLIENT_SECRET}"
-    authorization_url: "https://accounts.google.com/o/oauth2/auth"
-    token_url: "https://oauth2.googleapis.com/token"
-    device_authorization_url: "https://oauth2.googleapis.com/device/code"
-    userinfo_url: "https://www.googleapis.com/oauth2/v3/userinfo"
+  your_provider:
+    client_id: "${YOUR_PROVIDER_CLIENT_ID}"
+    client_secret: "${YOUR_PROVIDER_CLIENT_SECRET}"
+    authorization_url: "https://your-provider.com/oauth/authorize"
+    token_url: "https://your-provider.com/oauth/token"
+    userinfo_url: "https://your-provider.com/api/user"
 ```
 
-### Environment Variables
-
-Key environment variables you can set:
-
-```bash
-# Google Cloud
-GOOGLE_CLOUD_PROJECT=your-project-id
-GOOGLE_CLOUD_LOCATION=us-central1
-
-# OAuth
-GOOGLE_OAUTH_CLIENT_ID=your-client-id
-GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
-OAUTH_DEFAULT_PROVIDER=google
-OAUTH_FLOW_TYPE=device_flow
-
-# Agent
-AGENT_NAME=MyAgent
-MODEL_NAME=gemini-2.0-flash
-TOKEN_STORAGE_TYPE=secret_manager
-
-# Security
-OAUTH_REQUIRE_HTTPS=true
+2. **Add Provider Support** in `src/tools/authenticated_tool.py`:
+```python
+async def _fetch_your_provider_user_info(self, access_token: str) -> Dict[str, Any]:
+    # Implement your provider's userinfo API call
+    pass
 ```
 
-## 🔐 Authentication Flows
+### Creating Domain-Specific Tools
 
-### Device Flow (Recommended for CLI/Desktop)
+1. **Extend AuthenticatedTool**:
+```python
+class MyDomainTool(AuthenticatedTool):
+    async def execute_authenticated(self, user_context, action, **kwargs):
+        # Your domain-specific logic
+        api_data = await self._call_external_api(user_context["token"])
+        return self._format_response(api_data)
 
-1. User requests authentication
-2. Agent provides verification URL and code
-3. User visits URL and enters code
-4. Agent polls for completion
-5. Tokens stored securely
-
-### Authorization Code Flow (Web Applications)
-
-1. User redirected to OAuth provider
-2. User authorizes application
-3. Provider redirects with authorization code
-4. Agent exchanges code for tokens
-
-### Client Credentials Flow (Service-to-Service)
-
-1. Agent authenticates with client credentials
-2. Receives access token for API calls
-3. No user interaction required
-
-## 🛡 Security Features
-
-- **Secure Token Storage**: Choose between memory, encrypted files, or Google Cloud Secret Manager
-- **Token Lifecycle Management**: Automatic refresh and expiration handling
-- **A2A Authentication**: Multiple security schemes (OAuth2, Bearer, API Key)
-- **Per-User Isolation**: User credentials are isolated and encrypted
-- **HTTPS Enforcement**: Configurable HTTPS requirements
-- **JWT Validation**: Support for JWT token validation
-
-## 🚀 Deployment Options
-
-### Cloud Run
-
-- Serverless containerized deployment
-- Auto-scaling based on demand
-- Cost-effective for variable workloads
-- Full HTTP endpoint exposure
-
-```bash
-# Deploy with automatic image building
-python deployment/cloud_run/deploy.py
-
-# Deploy using existing image
-python deployment/cloud_run/deploy.py --no-build
-
-# Deploy to specific environment
-python deployment/cloud_run/deploy.py --environment production
+    async def _call_external_api(self, token):
+        # Make authenticated API calls to your services
+        pass
 ```
 
-### Vertex AI Agent Engine
+2. **Register Tools** in `src/agent.py`:
+```python
+# Create your tools
+my_tool = MyDomainTool()
+my_function_tool = FunctionTool(my_tool.execute_with_context)
 
-- Managed agent runtime
-- Integrated with Google Cloud AI services
-- Enhanced monitoring and observability
-- Native Gemini model integration
-
-```bash
-# Create new agent
-python deployment/agent_engine/deploy.py --action create
-
-# Update existing agent
-python deployment/agent_engine/deploy.py --action update --resource-id AGENT_ID
-
-# Test deployed agent
-python deployment/agent_engine/deploy.py --action test --resource-id AGENT_ID
+# Add to agent
+agent = Agent(
+    tools=[my_function_tool],
+    # ... other config
+)
 ```
 
-## 🔧 Development
+### Environment-Specific Configuration
 
-### Running Locally
+Create environment-specific `.env` files:
+- `.env.development` - Development settings
+- `.env.staging` - Staging settings
+- `.env.production` - Production settings
 
-1. Install dependencies:
-```bash
-pip install -r requirements.txt
-pip install -r requirements-dev.txt  # For development
+## 🛡️ Security Features
+
+### Token Security
+- **Encryption**: AES-256 encryption for file-based storage
+- **Lifecycle**: Automatic token refresh using refresh tokens
+- **Validation**: JWT signature verification for ID tokens
+- **Isolation**: Per-user token isolation and session management
+
+### Authentication Methods
+- **Bearer Tokens**: `Authorization: Bearer <token>` header support
+- **API Keys**: `X-API-Key` header for service accounts
+- **Basic Auth**: Client credentials for machine-to-machine
+- **JWT Validation**: ID token signature verification
+
+## 📊 API Endpoints
+
+### A2A Protocol
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/` | POST | A2A messages with your custom tools |
+| `/.well-known/agent-card.json` | GET | Public agent card |
+
+### OAuth Authentication
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/auth/initiate` | POST | Start OAuth flow |
+| `/auth/complete` | POST | Complete OAuth flow |
+| `/auth/status` | GET | Check auth status |
+
+### Health & Monitoring
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/health` | GET | Service health check |
+
+## 🧪 Testing
+
+### Using the Test Client
+
+```python
+# oauth_test_client.py
+client = AgentTestClient("http://localhost:8001")
+
+# Test OAuth flow
+auth_data = await client.initiate_oauth("user@example.com")
+# User completes OAuth in browser
+
+# Test your custom tools
+response = await client.send_authenticated_message(
+    "Use my custom tool",
+    "user@example.com"
+)
 ```
 
-2. Set up environment:
+### Manual Testing
+
 ```bash
-cp .env.example .env
-# Edit .env with your settings
+# Test health
+curl http://localhost:8001/health
+
+# Test OAuth initiation
+curl -X POST http://localhost:8001/auth/initiate \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "test@example.com", "provider": "google"}'
+
+# Test agent card
+curl http://localhost:8001/.well-known/agent-card.json
 ```
 
-3. Run the agent:
+## 🚀 Deployment
+
+### Local Development
 ```bash
+# Set environment variables
+export GOOGLE_OAUTH_CLIENT_ID="your-client-id"
+export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
+
+# Run agent
 python src/agent.py
 ```
 
-### Testing OAuth Authentication
-
-#### Using the Test Client (Recommended)
-
-The template includes a comprehensive test client for validating OAuth flows:
-
+### Cloud Run Deployment
 ```bash
-# Run complete test suite
-python oauth_test_client.py --user-id test@example.com
-
-# Test specific components
-python oauth_test_client.py --test oauth --user-id test@example.com
-python oauth_test_client.py --test tools --user-id test@example.com
-python oauth_test_client.py --test health
-
-# Test with different agent URL
-python oauth_test_client.py --agent-url http://localhost:8001 --user-id test@example.com
-
-# Enable verbose logging
-python oauth_test_client.py --verbose --user-id test@example.com
+# Build and deploy
+gcloud run deploy your-agent \
+  --source . \
+  --set-env-vars GOOGLE_OAUTH_CLIENT_ID=your-client-id \
+  --set-env-vars GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret \
+  --port 8001
 ```
 
-The test client will:
-1. Check initial authentication status
-2. Initiate OAuth flow if needed
-3. Guide you through browser authentication
-4. Test authenticated tool execution
-5. Validate all endpoints
-
-#### Manual Testing with curl
-
+### Vertex AI Agent Engine
 ```bash
-# Initiate authentication
-curl -X POST http://localhost:8000/auth/initiate \
-  -H "Content-Type: application/json" \
-  -d '{"user_id": "test-user", "provider": "google"}'
-
-# Check authentication status
-curl "http://localhost:8000/auth/status?user_id=test-user"
-
-# Test agent with authentication
-curl -X POST http://localhost:8000/ \
-  -H "Content-Type: application/json" \
-  -d '{"user_id": "test-user", "session_id": "test-session", "message": "Hello!"}'
+# Deploy to Agent Engine
+# Configure agent.yaml with your OAuth credentials
+# Deploy via Vertex AI Console or API
 ```
 
-## 📖 API Documentation
+## 🔍 Troubleshooting
 
-### A2A Endpoints
+### Common Issues
 
-- `GET /.well-known/agent-card.json` - Public agent card
-- `POST /` - A2A protocol messages (requires auth)
-- `GET /agent/authenticatedExtendedCard` - Extended card (requires auth)
+#### "User authentication required" Error
+- **Check**: OAuth client ID/secret configuration in `.env`
+- **Verify**: User has completed OAuth flow
+- **Debug**: Enable `LOG_LEVEL=DEBUG` to see authentication flow
 
-### Authentication Endpoints
+#### OAuth Flow Failure
+- **Check**: OAuth client ID/secret configuration
+- **Verify**: Network access to OAuth provider endpoints
+- **Debug**: Check logs for specific error messages
 
-- `POST /auth/initiate` - Start OAuth flow
-- `POST /auth/complete` - Complete OAuth flow
-- `GET /auth/status` - Check auth status
-- `POST /auth/revoke` - Revoke tokens
+#### Token Storage Issues
+- **File Storage**: Check file permissions in token storage directory
+- **Secret Manager**: Verify Google Cloud credentials and permissions
+- **Memory**: Tokens lost on restart (expected for memory storage)
 
-### Health Check
+### Debug Logging
+```python
+# Enable detailed OAuth flow logging
+import logging
+logging.getLogger('auth.oauth_middleware').setLevel(logging.DEBUG)
+logging.getLogger('agent_a2a.handlers').setLevel(logging.DEBUG)
+```
 
-- `GET /health` - Service health status
+## 📋 Template Checklist
+
+When creating your agent from this template:
+
+- ✅ **OAuth Configuration**: Update client ID/secret in `.env`
+- ✅ **Agent Details**: Customize name, description in `config/agent_config.yaml`
+- ✅ **Custom Tools**: Replace `example_tool.py` with your tools
+- ✅ **Agent Instructions**: Update agent behavior in `src/agent.py`
+- ✅ **Skills Definition**: Define your agent's capabilities
+- ✅ **Provider Configuration**: Add any additional OAuth providers
+- ✅ **Environment Setup**: Configure for your deployment environment
+- ✅ **Testing**: Verify OAuth flow and tool execution
+- ✅ **Documentation**: Update README with your agent's specifics
+
+## 🔧 Advanced Configuration
+
+### Custom Authentication Flows
+```python
+# Add custom auth flow in oauth_middleware.py
+async def custom_auth_flow(self, user_id: str, custom_params: dict):
+    # Implement your custom authentication logic
+    pass
+```
+
+### External API Integration
+```python
+# In your custom tool
+async def call_external_api(self, user_context):
+    token = user_context["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    # Make authenticated API calls
+```
+
+### Multi-Tenant Support
+```python
+# Configure tenant-specific OAuth providers
+# Add tenant context to user_context
+# Implement tenant-specific tool behavior
+```
+
+## 📖 Additional Resources
+
+- **Google ADK Documentation**: [Google ADK Guide](https://cloud.google.com/vertex-ai/generative-ai/docs/agent-development-kit)
+- **A2A Protocol Specification**: [Agent-to-Agent Protocol](https://docs.a2a.ai/)
+- **OAuth 2.0 Device Flow**: [RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628)
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+3. Implement changes with tests
+4. Update documentation
+5. Submit pull request
 
 ## 📝 License
 
-This template is provided under the Apache 2.0 License. See LICENSE file for details.
+This project is licensed under the Apache 2.0 License - see the LICENSE file for details.
 
-## 🆘 Support
+---
 
-- **Documentation**: See `docs/` directory for detailed guides
-- **Issues**: Report issues on the project repository
-- **Examples**: Check `src/tools/examples/` for implementation examples
-
-## 🔧 Key Features & Improvements
-
-This template provides a **production-ready** foundation for OAuth-authenticated agents with several critical improvements:
-
-### ✅ **Fixed OAuth Integration**
-- **Critical Bug Fix**: OAuth tokens now properly included in user context
-- **Session State Storage**: OAuth context stored in ADK session state for tool access
-- **Fallback Registry**: Global OAuth registry for robust context access
-- **Real API Integration**: Live calls to OAuth provider APIs (Google UserInfo, etc.)
-
-### 🛠️ **Enhanced Tool Development**
-- **Dual Execution Methods**: Both `execute_authenticated()` and `execute_with_context()`
-- **ADK Integration**: Proper `FunctionTool` registration with session state access
-- **Example Tools**: Ready-to-use profile and API integration examples
-- **Error Handling**: Comprehensive error handling and graceful degradation
-
-### 🔐 **Robust Authentication**
-- **Multiple Auth Schemes**: Bearer tokens, API keys, Basic auth, JWT validation
-- **Token Management**: Automatic refresh, secure storage, lifecycle management
-- **Provider Support**: Google, Azure, Okta, and custom OAuth providers
-- **Security**: HTTPS enforcement, token encryption, scope validation
-
-### 🧪 **Comprehensive Testing**
-- **Test Client**: Complete OAuth flow validation tool (`oauth_test_client.py`)
-- **End-to-End Testing**: Automated testing of all authentication flows
-- **Debug Support**: Detailed logging and troubleshooting capabilities
-
-### 📊 **Developer Experience**
-- **Clear Documentation**: Step-by-step setup and usage instructions
-- **Example Implementations**: Profile and API tools as templates
-- **Configuration Management**: Environment-specific settings and overrides
-- **Deployment Ready**: Cloud Run and Agent Engine deployment scripts
-
-## 🔄 Migration from Existing Agents
-
-To migrate an existing ADK agent to use this template:
-
-1. Copy your agent logic to `src/agent.py`
-2. Update tool registration to use `tool.execute_with_context` instead of `tool.execute_authenticated`
-3. Inherit from `AuthenticatedTool` and implement `execute_authenticated()` method
-4. Update configuration files with your OAuth settings
-5. Test authentication flows using the provided test client
-6. Update deployment scripts with your specific requirements
+**Agent Template** - Production-ready foundation for OAuth-authenticated AI agents 🚀

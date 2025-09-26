@@ -91,7 +91,7 @@ class OAuthMiddleware:
         self._session_states[session_id] = {
             "user_id": user_id,
             "provider": provider.name,
-            "device_code": auth_data["device_code"],
+            "device_code": auth_data.get("device_code"),
             "expires_at": time.time() + auth_data.get("expires_in", 1800),
             "interval": auth_data.get("interval", 5)
         }
@@ -226,6 +226,7 @@ class OAuthMiddleware:
         data = {
             "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
             "client_id": provider.client_id,
+            "client_secret": provider.client_secret,
             "device_code": session["device_code"]
         }
 
@@ -337,6 +338,9 @@ class OAuthMiddleware:
         """Get a valid access token for the user and provider."""
         provider_name = provider_name or self.config.default_provider
 
+        # First check for pending device flow sessions
+        await self._check_pending_device_flows(user_id, provider_name)
+
         token_data = await self.credential_store.get_token(user_id, provider_name)
 
         if not token_data:
@@ -355,6 +359,30 @@ class OAuthMiddleware:
                     return None
 
         return token_data if not token_data.is_expired() else None
+
+    async def _check_pending_device_flows(self, user_id: str, provider_name: str):
+        """Check and complete any pending device flow sessions."""
+        # Look for pending sessions for this user and provider
+        pending_sessions = [
+            (session_id, session) for session_id, session in self._session_states.items()
+            if session.get("user_id") == user_id and session.get("provider") == provider_name
+        ]
+
+        for session_id, session in pending_sessions:
+            try:
+                if time.time() > session["expires_at"]:
+                    # Session expired
+                    del self._session_states[session_id]
+                    continue
+
+                provider = self.config.providers.get(provider_name)
+                if provider and session.get("device_code"):
+                    # Try to complete the device flow
+                    await self._complete_device_flow(session, provider)
+                    # If successful, session will be cleaned up in _complete_device_flow
+            except Exception as e:
+                # Device flow not ready yet or failed
+                logger.debug(f"Device flow not ready for session {session_id}: {e}")
 
     async def _refresh_token(self, user_id: str, provider: OAuthProvider, refresh_token: str) -> TokenData:
         """Refresh an expired access token."""

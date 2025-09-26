@@ -1,1 +1,1 @@
-# Auth module for OAuth authentication
+"""OAuth authentication middleware and configuration."""

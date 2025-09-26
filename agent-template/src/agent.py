@@ -25,6 +25,7 @@ from google.adk.tools import FunctionTool
 from auth.auth_config import load_auth_config
 from agent_a2a.server import create_authenticated_a2a_server
 from tools.authenticated_tool import AuthenticatedTool
+from tools.example_tool import ExampleTool
 
 # Configure logging
 logging.basicConfig(
@@ -34,55 +35,25 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class ExampleAuthenticatedTool(AuthenticatedTool):
-    """Example tool that requires authentication."""
-
-    async def execute_authenticated(
-        self,
-        user_context: Dict[str, Any],
-        message: str = "Hello from authenticated tool!"
-    ) -> Dict[str, Any]:
-        """
-        Execute tool with authenticated user context.
-
-        Args:
-            user_context: User authentication context
-            message: Message to process
-
-        Returns:
-            Tool execution result
-        """
-        user_info = user_context.get("user_info", {})
-        user_email = user_info.get("email", "unknown")
-
-        return {
-            "message": f"Hello {user_email}! You said: {message}",
-            "user_context": {
-                "email": user_email,
-                "authenticated": True,
-                "provider": user_context.get("provider", "unknown")
-            },
-            "timestamp": self._get_timestamp()
-        }
 
 
-def create_example_agent() -> Agent:
-    """Create an example agent with authentication capabilities."""
+def create_agent() -> Agent:
+    """Create an OAuth-authenticated agent with customizable tools."""
 
     # Load configuration
     auth_config = load_auth_config()
 
     # Get environment-specific settings
     environment = os.getenv("ENVIRONMENT", "development")
-    agent_name = os.getenv("AGENT_NAME", "ExampleAgent")
+    agent_name = os.getenv("AGENT_NAME", "AuthenticatedAgent")
     model_name = os.getenv("MODEL_NAME", "gemini-2.0-flash")
 
     logger.info(f"Creating agent: {agent_name} (env: {environment})")
 
-    # Create authenticated tool
-    example_tool = ExampleAuthenticatedTool(name="example_authenticated_tool")
+    # Create example tool (customize this section for your specific agent)
+    example_tool = ExampleTool()
 
-    # Convert to FunctionTool for ADK - use execute_with_context for session state integration
+    # Convert to FunctionTool for ADK - tools will access user context from session state
     example_function_tool = FunctionTool(example_tool.execute_with_context)
 
     # Create agent
@@ -90,26 +61,33 @@ def create_example_agent() -> Agent:
         model=model_name,
         name=agent_name,
         instruction=f"""
-You are {agent_name}, an AI assistant with OAuth authentication capabilities.
+You are {agent_name}, an AI assistant with secure OAuth authentication capabilities.
 
-You can help users with various tasks while maintaining secure access to their data.
+Your primary purpose is to help users access authenticated services and information safely and securely.
 
 Key capabilities:
-- OAuth authentication with multiple providers (Google, Azure, Okta, custom)
-- Secure token management and storage
+- Secure OAuth authentication with multiple providers (Google, Azure, Okta, custom)
+- Access to authenticated APIs and user data
 - Agent-to-Agent (A2A) protocol communication
-- User context-aware responses
+- Secure token management and user data protection
 
-When users interact with you:
+When users need authenticated services:
 1. If they're not authenticated, guide them through the OAuth flow
-2. Use their authenticated context to provide personalized responses
-3. Ensure all API calls use their credentials securely
-4. Respect their privacy and data access permissions
+2. Use their authenticated context to access authorized services
+3. Format responses in a user-friendly way
+4. Respect their privacy and only access authorized data
 
 Available tools:
-- example_authenticated_tool: Demonstrates authenticated tool usage
+- example_tool: Example authenticated tool (customize for your needs)
 
-Always be helpful, secure, and transparent about authentication requirements.
+Example requests you can handle:
+- "Help me access my authenticated data"
+- "What can you do with my authentication?"
+- "Show me my information"
+
+Always be helpful, secure, and transparent about what information you can access.
+
+Note: This is a template agent. Customize the tools and instructions for your specific use case.
         """,
         tools=[example_function_tool],
         description=f"{agent_name} with OAuth authentication and A2A protocol support"
@@ -129,7 +107,7 @@ def main():
         logger.info(f"Starting agent in {environment} environment")
 
         # Create agent
-        agent = create_example_agent()
+        agent = create_agent()
 
         # Create authenticated A2A server
         server = create_authenticated_a2a_server(
@@ -177,7 +155,7 @@ def create_app():
     """Create app for uvicorn."""
     try:
         environment = os.getenv("ENVIRONMENT", "development")
-        agent = create_example_agent()
+        agent = create_agent()
 
         server = create_authenticated_a2a_server(
             agent=agent,

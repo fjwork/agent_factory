@@ -5,7 +5,6 @@ This module provides request handlers with OAuth authentication integration.
 """
 
 import logging
-import time
 from typing import Dict, Any, Optional
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
@@ -25,19 +24,18 @@ logger = logging.getLogger(__name__)
 class AuthenticatedRequestHandler(DefaultRequestHandler):
     """Request handler with OAuth authentication."""
 
-    # Global OAuth context registry for fallback access
-    _oauth_registry: Dict[str, Dict[str, Any]] = {}
-
     def __init__(
         self,
         agent_executor: AgentExecutor,
         task_store: TaskStore,
         oauth_middleware: OAuthMiddleware,
-        card_builder: AgentCardBuilder
+        card_builder: AgentCardBuilder,
+        runner=None
     ):
         super().__init__(agent_executor, task_store)
         self.oauth_middleware = oauth_middleware
         self.card_builder = card_builder
+        self.runner = runner
 
     async def handle_post(self, request: Request) -> Response:
         """Handle A2A POST requests with authentication."""
@@ -64,15 +62,55 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
             # Add user context to request
             request.state.user_context = user_context
 
-            # Store OAuth context in session state for tool access
+            # Parse the JSON-RPC request to determine which method to call
             body = await request.body()
-            await self._store_oauth_in_session_state(user_context, body)
+            if body:
+                # Store OAuth context in ADK session state with parsed body
+                await self._store_oauth_in_session_state(user_context, body)
+                import json
+                from a2a.types import MessageSendParams
+                from a2a.server.context import ServerCallContext
 
-            # Store OAuth context in global registry as fallback
-            await self._store_oauth_in_global_registry(user_context)
+                data = json.loads(body)
+                method = data.get("method")
 
-            # Call parent handler
-            return await super().handle_post(request)
+                if method == "message/send":
+                    # Extract params and create MessageSendParams object
+                    params_data = data.get("params", {})
+                    message_params = MessageSendParams.model_validate(params_data)
+
+                    # Create server context
+                    context = ServerCallContext(request=request)
+
+                    # Call the parent method with correct parameters
+                    result = await self.on_message_send(message_params, context)
+
+                    # Return JSON-RPC response
+                    return JSONResponse({
+                        "jsonrpc": "2.0",
+                        "id": data.get("id"),
+                        "result": result.model_dump() if hasattr(result, 'model_dump') else result
+                    })
+
+                elif method == "message/send_stream":
+                    # Handle streaming if needed
+                    params_data = data.get("params", {})
+                    message_params = MessageSendParams.model_validate(params_data)
+                    context = ServerCallContext(request=request)
+
+                    # This would need to handle streaming response
+                    async_gen = self.on_message_send_stream(message_params, context)
+                    # For now, return error as streaming needs special handling
+                    return JSONResponse(
+                        {"error": "Streaming not implemented yet"},
+                        status_code=501
+                    )
+
+            # Default fallback
+            return JSONResponse(
+                {"error": "Unsupported method"},
+                status_code=400
+            )
 
         except Exception as e:
             logger.error(f"Authentication error in POST handler: {e}")
@@ -292,63 +330,6 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
 
         return None
 
-    async def _store_oauth_in_session_state(self, user_context: Dict[str, Any], body: bytes) -> None:
-        """Store OAuth context in ADK session state for tool access."""
-        try:
-            # Parse the request body to extract session information
-            import json
-            request_data = json.loads(body.decode()) if body else {}
-
-            # Get session ID from the request
-            session_id = request_data.get("session_id")
-
-            if not session_id:
-                logger.warning("No session_id found in request body, cannot store OAuth in session state")
-                return
-
-            # Store OAuth context in session state via the agent executor
-            if hasattr(self.agent_executor, 'update_session_state'):
-                oauth_context = {
-                    "oauth_user_id": user_context.get("user_id"),
-                    "oauth_provider": user_context.get("provider"),
-                    "oauth_user_info": user_context.get("user_info", {}),
-                    "oauth_token": user_context.get("token"),
-                    "oauth_authenticated": True
-                }
-
-                await self.agent_executor.update_session_state(session_id, oauth_context)
-                logger.info(f"Stored OAuth context in session state for user {user_context.get('user_id')}")
-            else:
-                logger.warning("Agent executor does not support update_session_state, falling back to global registry only")
-
-        except Exception as e:
-            logger.error(f"Failed to store OAuth context in session state: {e}")
-            # Continue execution - global registry will be used as fallback
-
-    async def _store_oauth_in_global_registry(self, user_context: Dict[str, Any]) -> None:
-        """Store OAuth context in global registry as fallback mechanism."""
-        try:
-            user_id = user_context.get("user_id")
-            if not user_id:
-                logger.warning("No user_id in context, cannot store in global registry")
-                return
-
-            oauth_context = {
-                "oauth_user_id": user_id,
-                "oauth_provider": user_context.get("provider"),
-                "oauth_user_info": user_context.get("user_info", {}),
-                "oauth_token": user_context.get("token"),
-                "oauth_authenticated": True,
-                "timestamp": time.time()
-            }
-
-            # Store in class-level registry
-            AuthenticatedRequestHandler._oauth_registry[user_id] = oauth_context
-            logger.info(f"Stored OAuth context in global registry for user {user_id}")
-
-        except Exception as e:
-            logger.error(f"Failed to store OAuth context in global registry: {e}")
-
     def _create_auth_required_response(self, schemes: list = None) -> Response:
         """Create a response indicating authentication is required."""
         schemes = schemes or ["Bearer", "Basic", "ApiKey"]
@@ -363,3 +344,144 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
             status_code=401,
             headers={"WWW-Authenticate": www_auth_header}
         )
+
+    async def _store_oauth_in_session_state(self, user_context: Dict[str, Any], body: bytes) -> None:
+        """Store OAuth context in ADK session state for tools to access."""
+        try:
+            user_id = user_context.get("user_id")
+            if not user_id:
+                logger.warning("No user_id in user context, cannot store OAuth context")
+                return
+
+            # Parse the JSON-RPC request to get session information
+            if not body:
+                logger.warning("No request body, cannot determine session")
+                return
+
+            import json
+            data = json.loads(body)
+            params_data = data.get("params", {})
+
+            # Extract session info from the A2A request
+            # ADK will create a session with the user_id from the A2A message
+            message_params = params_data.get("message", {})
+            context_id = params_data.get("context_id")
+
+            # Get the session service from the runner
+            if not self.runner:
+                logger.warning("No runner available, cannot access session service")
+                return
+
+            session_service = self.runner.session_service
+
+            # For A2A requests, ADK typically creates a user_id like "A2A_USER_<context_id>"
+            # We need to store OAuth context in the session that will be used
+            if context_id:
+                # Try to create/get session with the context_id as user_id
+                adk_user_id = f"A2A_USER_{context_id}"
+                app_name = self.runner.app_name
+
+                try:
+                    # Try to get existing session or create new one
+                    session = await session_service.get_session(
+                        app_name=app_name,
+                        user_id=adk_user_id,
+                        session_id=context_id
+                    )
+
+                    if not session:
+                        # Create a new session with OAuth context in state
+                        oauth_state = {
+                            "oauth_user_id": user_context.get("user_id"),
+                            "oauth_provider": user_context.get("provider"),
+                            "oauth_user_info": user_context.get("user_info", {}),
+                            "oauth_token": user_context.get("token") or user_context.get("access_token"),
+                            "oauth_authenticated": True
+                        }
+
+                        session = await session_service.create_session(
+                            app_name=app_name,
+                            user_id=adk_user_id,
+                            session_id=context_id,
+                            state=oauth_state
+                        )
+                        logger.info(f"Created new session with OAuth context for user: {adk_user_id}")
+                    else:
+                        # Update existing session with OAuth context
+                        oauth_state = {
+                            "oauth_user_id": user_context.get("user_id"),
+                            "oauth_provider": user_context.get("provider"),
+                            "oauth_user_info": user_context.get("user_info", {}),
+                            "oauth_token": user_context.get("token") or user_context.get("access_token"),
+                            "oauth_authenticated": True
+                        }
+
+                        # Update session state
+                        session.state.update(oauth_state)
+                        await session_service.save_session(session)
+                        logger.info(f"Updated session with OAuth context for user: {adk_user_id}")
+
+                except Exception as e:
+                    logger.error(f"Failed to create/update session: {e}")
+                    # Fallback to global registry
+                    await self._store_oauth_in_global_registry(user_context)
+            else:
+                logger.warning("No context_id in request, using global registry fallback")
+                await self._store_oauth_in_global_registry(user_context)
+
+        except Exception as e:
+            logger.error(f"Failed to store OAuth context in session: {e}")
+            # Fallback to global registry
+            await self._store_oauth_in_global_registry(user_context)
+
+    async def _store_oauth_in_global_registry(self, user_context: Dict[str, Any]) -> None:
+        """Fallback method to store OAuth context in global registry."""
+        try:
+            user_id = user_context.get("user_id")
+            if not user_id:
+                return
+
+            # Debug: Log what's actually in user_context
+            logger.info(f"Debug: user_context keys: {list(user_context.keys())}")
+            logger.info(f"Debug: user_context content: {user_context}")
+
+            # Get the actual token - it might be stored differently
+            token = (user_context.get("token") or
+                    user_context.get("access_token") or
+                    user_context.get("oauth_token"))
+
+            oauth_context = {
+                "oauth_user_id": user_context.get("user_id"),
+                "oauth_provider": user_context.get("provider"),
+                "oauth_user_info": user_context.get("user_info", {}),
+                "oauth_token": token,
+                "oauth_authenticated": True
+            }
+
+            # Store in a module-level registry
+            if not hasattr(self.__class__, '_oauth_registry'):
+                self.__class__._oauth_registry = {}
+
+            self.__class__._oauth_registry[user_id] = oauth_context
+            logger.info(f"Stored OAuth context in global registry for user: {user_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to store OAuth context in global registry: {e}")
+
+    @classmethod
+    def get_oauth_context(cls, user_id: str) -> Dict[str, Any]:
+        """Get OAuth context for a user."""
+        if not hasattr(cls, '_oauth_registry'):
+            return {}
+        return cls._oauth_registry.get(user_id, {})
+
+    async def handle_get_card(self, agent_card: AgentCard) -> Response:
+        """Handle GET requests for agent card."""
+        try:
+            return JSONResponse(agent_card.model_dump())
+        except Exception as e:
+            logger.error(f"Failed to handle agent card request: {e}")
+            return JSONResponse(
+                {"error": "Failed to generate agent card"},
+                status_code=500
+            )

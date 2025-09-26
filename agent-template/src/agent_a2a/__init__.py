@@ -1,1 +1,1 @@
-# A2A protocol module
+"""A2A (Agent-to-Agent) protocol implementation with OAuth authentication."""

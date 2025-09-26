@@ -65,7 +65,8 @@ class AuthenticatedA2AServer:
             agent_executor=self.executor,
             task_store=InMemoryTaskStore(),
             oauth_middleware=self.oauth_middleware,
-            card_builder=self.card_builder
+            card_builder=self.card_builder,
+            runner=self.runner  # Pass runner for session management
         )
 
         # Create Starlette application

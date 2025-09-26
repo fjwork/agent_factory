@@ -6,15 +6,10 @@ This module provides a base class for creating tools that require user authentic
 
 import time
 import logging
+import httpx
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from datetime import datetime
-
-try:
-    from google.adk.tools import ToolContext
-except ImportError:
-    # For environments where ADK is not available
-    ToolContext = None
 
 logger = logging.getLogger(__name__)
 
@@ -47,74 +42,6 @@ class AuthenticatedTool(ABC):
             ToolExecutionError: If tool execution fails
         """
         pass
-
-    async def execute_with_context(self, tool_context, **kwargs) -> Dict[str, Any]:
-        """
-        Execute tool using ADK ToolContext for user authentication.
-
-        This method extracts OAuth context from ADK session state and calls execute_authenticated.
-
-        Args:
-            tool_context: ADK ToolContext with session state
-            **kwargs: Tool-specific parameters
-
-        Returns:
-            Tool execution result
-
-        Raises:
-            AuthenticationError: If user context is invalid or missing
-            ToolExecutionError: If tool execution fails
-        """
-        if ToolContext is None:
-            raise AuthenticationError("ADK ToolContext not available - ensure google.adk is installed")
-
-        # Extract OAuth context from session state
-        user_context = {
-            "user_id": tool_context.state.get("oauth_user_id"),
-            "provider": tool_context.state.get("oauth_provider"),
-            "user_info": tool_context.state.get("oauth_user_info", {}),
-            "token": tool_context.state.get("oauth_token")
-        }
-
-        # If session state doesn't have OAuth context, try global registry fallback
-        if not user_context["user_id"] or not user_context["token"]:
-            # Import here to avoid circular imports
-            try:
-                from agent_a2a.handlers import AuthenticatedRequestHandler
-
-                # Check if there's OAuth context in the global registry
-                if hasattr(AuthenticatedRequestHandler, '_oauth_registry'):
-                    registry = AuthenticatedRequestHandler._oauth_registry
-                    # Find any authenticated user (in practice there should be only one at a time)
-                    for user_id, oauth_context in registry.items():
-                        if oauth_context.get("oauth_authenticated"):
-                            # Normalize the context to ensure compatibility
-                            user_context = {
-                                "user_id": oauth_context.get("oauth_user_id"),
-                                "oauth_user_id": oauth_context.get("oauth_user_id"),
-                                "provider": oauth_context.get("oauth_provider"),
-                                "oauth_provider": oauth_context.get("oauth_provider"),
-                                "user_info": oauth_context.get("oauth_user_info", {}),
-                                "oauth_user_info": oauth_context.get("oauth_user_info", {}),
-                                "token": oauth_context.get("oauth_token"),
-                                "oauth_token": oauth_context.get("oauth_token")
-                            }
-                            logger.info(f"Using global registry OAuth context for user {user_id}")
-                            break
-            except ImportError:
-                pass
-
-        # Validate that we have required authentication context
-        if not user_context.get("user_id"):
-            raise AuthenticationError("No user ID found in session state or global registry")
-
-        if not user_context.get("token"):
-            raise AuthenticationError("No OAuth token found in session state or global registry")
-
-        logger.debug(f"Executing tool {self.name} with OAuth context for user {user_context['user_id']}")
-
-        # Call the authenticated execution method
-        return await self.execute_authenticated(user_context, **kwargs)
 
     def validate_user_context(self, user_context: Dict[str, Any]) -> bool:
         """
@@ -198,11 +125,6 @@ class AuthenticatedTool(ABC):
 
     async def _fetch_google_user_info(self, access_token: str) -> Dict[str, Any]:
         """Fetch user information from Google UserInfo API."""
-        try:
-            import httpx
-        except ImportError:
-            raise ToolExecutionError("httpx is required for OAuth provider API calls. Install with: pip install httpx")
-
         url = "https://www.googleapis.com/oauth2/v2/userinfo"
         headers = {"Authorization": f"Bearer {access_token}"}
 
