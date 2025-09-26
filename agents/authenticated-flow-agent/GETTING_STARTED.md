@@ -18,7 +18,7 @@ pip install -r auth-verification-remote/requirements.txt
 ./start_agents.sh
 
 # 5. In a new terminal, test it works
-python quick_test.py
+python3 quick_test.py
 ```
 
 ## 🎯 What This Does

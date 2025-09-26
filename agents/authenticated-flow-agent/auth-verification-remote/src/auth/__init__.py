@@ -1,0 +1,1 @@
+"""OAuth authentication middleware and configuration."""

@@ -46,7 +46,7 @@ authenticated-flow-agent/
 cd agents/authenticated-flow-agent
 
 # Verify setup before starting (optional)
-python verify_setup.py
+python3 verify_setup.py
 
 # Create and activate Python virtual environment
 python3 -m venv venv
@@ -88,7 +88,7 @@ pip install -r auth-verification-remote/requirements.txt
 # In a new terminal (keep agents running)
 cd agents/authenticated-flow-agent
 source venv/bin/activate
-python quick_test.py
+python3 quick_test.py
 ```
 
 **Expected Output:**
@@ -110,7 +110,7 @@ python quick_test.py
 ### 4. Run Full Test Suite
 
 ```bash
-python test_auth_flow.py
+python3 test_auth_flow.py
 ```
 
 ## 🧪 Manual Testing
@@ -264,7 +264,7 @@ pip install -r requirements.txt
 pip install -r auth-verification-remote/requirements.txt
 
 # Check Python path issues
-python -c "import google.adk.agents; print('ADK imported successfully')"
+python3 -c "import google.adk.agents; print('ADK imported successfully')"
 ```
 
 ## 🔄 Development Workflow
@@ -273,7 +273,7 @@ python -c "import google.adk.agents; print('ADK imported successfully')"
 1. Stop agents: `Ctrl+C` in terminal running `start_agents.sh`
 2. Make code changes
 3. Restart: `./start_agents.sh`
-4. Test: `python quick_test.py`
+4. Test: `python3 quick_test.py`
 
 ### Adding New Tests
 1. Edit `test_auth_flow.py` for comprehensive tests

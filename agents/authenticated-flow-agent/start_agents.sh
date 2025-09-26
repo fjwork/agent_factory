@@ -24,10 +24,13 @@ echo "✅ Ports 8001 and 8002 are available"
 # Navigate to the agents directory
 cd "$(dirname "$0")"
 
+# Activate virtual environment
+source venv/bin/activate
+
 # Start remote agent in background
 echo "🔧 Starting Auth Verification Remote Agent (port 8002)..."
 cd auth-verification-remote/src
-python agent.py &
+python3 agent.py &
 REMOTE_PID=$!
 echo "✅ Remote agent started with PID: $REMOTE_PID"
 
@@ -37,7 +40,7 @@ sleep 3
 # Start orchestrator agent in background
 echo "🔧 Starting Authenticated Flow Agent (port 8001)..."
 cd ../../src
-python agent.py &
+python3 agent.py &
 ORCHESTRATOR_PID=$!
 echo "✅ Orchestrator agent started with PID: $ORCHESTRATOR_PID"
 
@@ -57,7 +60,7 @@ echo "   - Remote:          curl http://localhost:8002/auth/dual-status"
 echo "   - Orchestrator:    curl http://localhost:8001/auth/dual-status"
 echo ""
 echo "📝 To run tests:"
-echo "   python test_auth_flow.py"
+echo "   python3 test_auth_flow.py"
 echo ""
 echo "🛑 To stop agents:"
 echo "   kill $REMOTE_PID $ORCHESTRATOR_PID"

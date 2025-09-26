@@ -21,7 +21,7 @@ load_dotenv()
 template_src = os.path.join(os.path.dirname(__file__), "..", "..", "..", "agent-template", "src")
 sys.path.insert(0, template_src)
 
-from google.adk.agents import Agent, RemoteA2aAgent
+from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 
 from auth.auth_config import load_auth_config
@@ -58,8 +58,12 @@ def create_agent() -> Agent:
     logger.info(f"Configuring remote agent connection to: {remote_agent_url}")
 
     try:
+        from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
+
         remote_auth_agent = RemoteA2aAgent(
-            agent_card_url=f"{remote_agent_url}/.well-known/agent-card.json"
+            name="remote_auth_agent",
+            description="Remote agent for testing A2A authentication forwarding",
+            agent_card=f"{remote_agent_url}/.well-known/agent-card.json"
         )
         sub_agents = [remote_auth_agent]
         logger.info("✅ Remote agent configured successfully")
