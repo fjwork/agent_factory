@@ -1,0 +1,211 @@
+# Deployment Configuration Template
+# This file defines deployment settings for different environments and platforms
+
+# Common deployment settings
+deployment:
+  image:
+    registry: "${DOCKER_REGISTRY:gcr.io}"
+    project_id: "${GOOGLE_CLOUD_PROJECT}"
+    name: "${IMAGE_NAME:adk-agent}"
+    tag: "${IMAGE_TAG:latest}"
+
+  # Environment variables for all deployments
+  env_vars:
+    # Google Cloud settings
+    GOOGLE_CLOUD_PROJECT: "${GOOGLE_CLOUD_PROJECT}"
+    GOOGLE_CLOUD_LOCATION: "${GOOGLE_CLOUD_LOCATION:us-central1}"
+
+    # OAuth configuration
+    OAUTH_DEFAULT_PROVIDER: "${OAUTH_DEFAULT_PROVIDER:google}"
+    OAUTH_FLOW_TYPE: "${OAUTH_FLOW_TYPE:device_flow}"
+    OAUTH_SCOPES: "${OAUTH_SCOPES:openid profile email}"
+
+    # Agent configuration
+    AGENT_NAME: "${AGENT_NAME:MyAgent}"
+    AGENT_VERSION: "${AGENT_VERSION:1.0.0}"
+    MODEL_PROVIDER: "${MODEL_PROVIDER:gemini}"
+    MODEL_NAME: "${MODEL_NAME:gemini-2.0-flash}"
+
+    # Security
+    TOKEN_STORAGE_TYPE: "secret_manager"
+    OAUTH_REQUIRE_HTTPS: "true"
+
+  # Secrets (stored in Google Cloud Secret Manager)
+  secrets:
+    # OAuth credentials
+    GOOGLE_OAUTH_CLIENT_ID: "oauth-client-id"
+    GOOGLE_OAUTH_CLIENT_SECRET: "oauth-client-secret"
+    AZURE_OAUTH_CLIENT_ID: "azure-client-id"
+    AZURE_OAUTH_CLIENT_SECRET: "azure-client-secret"
+    AZURE_TENANT_ID: "azure-tenant-id"
+
+    # API keys
+    GOOGLE_API_KEY: "google-api-key"
+
+    # Agent-specific secrets
+    AGENT_ENCRYPTION_KEY: "agent-encryption-key"
+
+# Cloud Run specific configuration
+cloud_run:
+  service_name: "${CLOUD_RUN_SERVICE_NAME:${AGENT_NAME:adk-agent}}"
+  region: "${GOOGLE_CLOUD_LOCATION:us-central1}"
+
+  # Resource allocation
+  resources:
+    cpu: "${CLOUD_RUN_CPU:1}"
+    memory: "${CLOUD_RUN_MEMORY:512Mi}"
+    max_instances: "${CLOUD_RUN_MAX_INSTANCES:10}"
+    min_instances: "${CLOUD_RUN_MIN_INSTANCES:0}"
+
+  # Service configuration
+  service:
+    port: 8000
+    allow_unauthenticated: "${CLOUD_RUN_ALLOW_UNAUTH:true}"
+    ingress: "${CLOUD_RUN_INGRESS:all}"
+    timeout: "${CLOUD_RUN_TIMEOUT:300}"
+
+  # Additional Cloud Run settings
+  annotations:
+    "run.googleapis.com/vpc-access-connector": "${VPC_CONNECTOR:}"
+    "run.googleapis.com/vpc-access-egress": "${VPC_EGRESS:private-ranges-only}"
+
+  # Environment-specific overrides
+  environments:
+    development:
+      resources:
+        cpu: "0.5"
+        memory: "256Mi"
+        max_instances: 3
+      service:
+        allow_unauthenticated: true
+
+    staging:
+      resources:
+        cpu: "1"
+        memory: "512Mi"
+        max_instances: 5
+      service:
+        allow_unauthenticated: true
+
+    production:
+      resources:
+        cpu: "2"
+        memory: "1Gi"
+        max_instances: 20
+        min_instances: 1
+      service:
+        allow_unauthenticated: false
+
+# Agent Engine (Vertex AI) specific configuration
+agent_engine:
+  display_name: "${AGENT_ENGINE_DISPLAY_NAME:${AGENT_NAME:MyAgent}}"
+  description: "${AGENT_ENGINE_DESCRIPTION:ADK Agent with OAuth authentication}"
+  region: "${GOOGLE_CLOUD_LOCATION:us-central1}"
+
+  # Agent configuration
+  agent:
+    model: "projects/${GOOGLE_CLOUD_PROJECT}/locations/${GOOGLE_CLOUD_LOCATION}/publishers/google/models/${MODEL_NAME:gemini-2.0-flash}"
+    temperature: "${AGENT_TEMPERATURE:0.7}"
+    max_output_tokens: "${AGENT_MAX_TOKENS:1024}"
+
+  # Tools configuration
+  tools:
+    enable_code_execution: "${ENABLE_CODE_EXECUTION:false}"
+    enable_search: "${ENABLE_SEARCH:false}"
+
+  # Security settings
+  security:
+    enable_authentication: true
+    allowed_domains: "${ALLOWED_DOMAINS:}"
+
+  # Environment-specific overrides
+  environments:
+    development:
+      agent:
+        temperature: 0.9
+      tools:
+        enable_code_execution: true
+
+    staging:
+      agent:
+        temperature: 0.7
+
+    production:
+      agent:
+        temperature: 0.5
+        max_output_tokens: 2048
+      security:
+        enable_authentication: true
+
+# Docker configuration
+docker:
+  base_image: "${DOCKER_BASE_IMAGE:python:3.11-slim}"
+  working_dir: "/app"
+
+  # Build settings
+  build:
+    context: "."
+    dockerfile: "deployment/docker/Dockerfile"
+    target: "${DOCKER_TARGET:production}"
+
+  # Multi-stage build targets
+  targets:
+    development:
+      base_image: "python:3.11"
+      install_dev_deps: true
+
+    production:
+      base_image: "python:3.11-slim"
+      install_dev_deps: false
+
+# Infrastructure as Code (optional)
+terraform:
+  state_bucket: "${TERRAFORM_STATE_BUCKET:${GOOGLE_CLOUD_PROJECT}-terraform-state}"
+  state_prefix: "adk-agents/${AGENT_NAME:my-agent}"
+
+# Monitoring and logging
+monitoring:
+  enable_cloud_trace: "${ENABLE_CLOUD_TRACE:true}"
+  enable_cloud_monitoring: "${ENABLE_CLOUD_MONITORING:true}"
+  enable_cloud_logging: "${ENABLE_CLOUD_LOGGING:true}"
+
+  # Log level
+  log_level: "${LOG_LEVEL:INFO}"
+
+  # Health checks
+  health_check:
+    path: "/health"
+    interval_seconds: 30
+    timeout_seconds: 5
+
+# CI/CD configuration
+cicd:
+  # Build triggers
+  build_trigger:
+    branch_pattern: "${BUILD_BRANCH_PATTERN:^main$}"
+    dockerfile_path: "deployment/docker/Dockerfile"
+
+  # Deployment settings
+  auto_deploy:
+    development: true
+    staging: true
+    production: false  # Requires manual approval
+
+# Environment-specific complete overrides
+environments:
+  development:
+    deployment:
+      env_vars:
+        LOG_LEVEL: "DEBUG"
+        OAUTH_REQUIRE_HTTPS: "false"
+
+  staging:
+    deployment:
+      env_vars:
+        LOG_LEVEL: "INFO"
+
+  production:
+    deployment:
+      env_vars:
+        LOG_LEVEL: "WARNING"
+        OAUTH_REQUIRE_HTTPS: "true"
