@@ -4,6 +4,7 @@ Authenticated Request Handlers
 This module provides request handlers with OAuth authentication integration.
 """
 
+import os
 import logging
 from typing import Dict, Any, Optional
 from starlette.requests import Request
@@ -17,6 +18,7 @@ from a2a.types import AgentCard
 
 from .agent_card import AgentCardBuilder
 from auth.oauth_middleware import OAuthMiddleware
+from auth.dual_auth_middleware import DualAuthMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -34,26 +36,32 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
     ):
         super().__init__(agent_executor, task_store)
         self.oauth_middleware = oauth_middleware
+        self.dual_auth_middleware = DualAuthMiddleware(oauth_middleware)
         self.card_builder = card_builder
         self.runner = runner
 
     async def handle_post(self, request: Request) -> Response:
-        """Handle A2A POST requests with authentication."""
+        """Handle A2A POST requests with dual authentication (Bearer token + OAuth)."""
         try:
-            # Extract authentication information
-            auth_info = await self._extract_auth_info(request)
+            # Extract authentication context using dual middleware
+            user_context = await self.dual_auth_middleware.extract_auth_context(request)
 
-            if not auth_info:
+            if not user_context:
+                # No authentication found - return requirements
+                auth_requirements = self.dual_auth_middleware.get_authentication_requirements()
                 return JSONResponse(
-                    {"error": "Authentication required"},
+                    {
+                        "error": "Authentication required",
+                        "message": "This endpoint requires authentication",
+                        "supported_methods": auth_requirements["supported_methods"],
+                        "details": auth_requirements
+                    },
                     status_code=401,
                     headers={"WWW-Authenticate": "Bearer, OAuth"}
                 )
 
-            # Validate authentication
-            user_context = await self._validate_authentication(auth_info)
-
-            if not user_context:
+            # Check if authentication was successful
+            if not user_context.get("authenticated", False):
                 return JSONResponse(
                     {"error": "Invalid or expired authentication"},
                     status_code=401
@@ -120,22 +128,26 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
             )
 
     async def handle_authenticated_extended_card(self, request: Request) -> Response:
-        """Handle authenticated extended agent card requests."""
+        """Handle authenticated extended agent card requests with dual authentication."""
         try:
-            # Extract authentication information
-            auth_info = await self._extract_auth_info(request)
+            # Extract authentication context using dual middleware
+            user_context = await self.dual_auth_middleware.extract_auth_context(request)
 
-            if not auth_info:
+            if not user_context:
+                # No authentication found - return requirements
+                auth_requirements = self.dual_auth_middleware.get_authentication_requirements()
                 return JSONResponse(
-                    {"error": "Authentication required"},
+                    {
+                        "error": "Authentication required",
+                        "message": "Extended agent card requires authentication",
+                        "supported_methods": auth_requirements["supported_methods"]
+                    },
                     status_code=401,
                     headers={"WWW-Authenticate": "Bearer, OAuth"}
                 )
 
-            # Validate authentication
-            user_context = await self._validate_authentication(auth_info)
-
-            if not user_context:
+            # Check if authentication was successful
+            if not user_context.get("authenticated", False):
                 return JSONResponse(
                     {"error": "Invalid or expired authentication"},
                     status_code=401
@@ -474,6 +486,49 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
         if not hasattr(cls, '_oauth_registry'):
             return {}
         return cls._oauth_registry.get(user_id, {})
+
+    def get_auth_status(self) -> Dict[str, Any]:
+        """Get authentication status and configuration."""
+        return {
+            "dual_authentication_enabled": True,
+            "supported_methods": ["bearer_token", "oauth_device_flow"],
+            "bearer_token_validation": os.getenv("BEARER_TOKEN_VALIDATION", "jwt"),
+            "oauth_device_flow_enabled": True,
+            "environment_testing": {
+                "bearer_valid_mode": self.dual_auth_middleware.is_bearer_token_valid_env(),
+                "bearer_invalid_mode": self.dual_auth_middleware.is_bearer_token_invalid_env()
+            }
+        }
+
+    async def handle_auth_status(self, request: Request) -> Response:
+        """Handle authentication status requests (for debugging/testing)."""
+        try:
+            auth_status = self.get_auth_status()
+
+            # Try to extract auth context for current request
+            user_context = await self.dual_auth_middleware.extract_auth_context(request)
+
+            if user_context:
+                auth_status["current_authentication"] = {
+                    "authenticated": True,
+                    "auth_type": user_context.get("auth_type"),
+                    "user_id": user_context.get("user_id"),
+                    "provider": user_context.get("provider")
+                }
+            else:
+                auth_status["current_authentication"] = {
+                    "authenticated": False,
+                    "message": "No valid authentication found"
+                }
+
+            return JSONResponse(auth_status)
+
+        except Exception as e:
+            logger.error(f"Auth status check failed: {e}")
+            return JSONResponse(
+                {"error": "Failed to check authentication status"},
+                status_code=500
+            )
 
     async def handle_get_card(self, agent_card: AgentCard) -> Response:
         """Handle GET requests for agent card."""

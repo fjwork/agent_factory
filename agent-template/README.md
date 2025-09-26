@@ -10,14 +10,15 @@ This template provides a complete foundation for creating OAuth-authenticated AI
 
 ## ✨ Key Features
 
-- **🔐 Complete OAuth Integration**: Device Flow, Authorization Code, and Client Credentials flows
+- **🔐 Dual Authentication Support**: Bearer token + OAuth device flow authentication
 - **🌐 Multi-Provider Support**: Google, Azure AD, Okta, and custom identity providers
 - **🛡️ Enterprise Security**: Token encryption, HTTPS enforcement, JWT validation
-- **📡 A2A Protocol**: Full Agent-to-Agent protocol with authentication
+- **📡 A2A Protocol**: Full Agent-to-Agent protocol with authentication forwarding
 - **🤖 Google ADK Integration**: Native Gemini model integration with tool execution
 - **📊 Real API Integration**: Live data from OAuth provider APIs
 - **🔄 Token Management**: Automatic refresh, secure storage, lifecycle management
 - **📋 Template Structure**: Easy to customize for your specific agent needs
+- **🔀 Bearer Token Support**: Accept pre-authenticated tokens from web apps/orchestrators
 
 ## 🏗️ Template Architecture
 
@@ -167,6 +168,94 @@ python oauth_test_client.py
 # 3. Authorize the application
 # 4. Test your custom tools
 ```
+
+## 🔐 Dual Authentication Guide
+
+This template supports **two authentication patterns** that can work together:
+
+### Pattern 1: Bearer Token Authentication (New)
+For pre-authenticated requests from web apps or orchestrator agents:
+
+```bash
+# Example: Bearer token from web app
+curl -X POST http://localhost:8001/ \
+  -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "1",
+    "method": "message/send",
+    "params": {
+      "message": {
+        "role": "user",
+        "content": [{"text": "Hello from web app"}]
+      }
+    }
+  }'
+```
+
+### Pattern 2: OAuth Device Flow (Existing)
+For interactive user authentication:
+
+```bash
+# Step 1: Initiate OAuth flow
+curl -X POST http://localhost:8001/auth/initiate \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "user@example.com", "provider": "google"}'
+
+# Step 2: User completes OAuth in browser
+# Step 3: Send authenticated A2A request
+curl -X POST http://localhost:8001/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "1",
+    "method": "message/send",
+    "params": {
+      "message": {
+        "role": "user",
+        "content": [{"text": "Hello from OAuth user"}]
+      }
+    },
+    "user_id": "user@example.com"
+  }'
+```
+
+### Testing Bearer Token Validation
+
+Configure bearer token validation mode in `.env`:
+
+```bash
+# Always accept bearer tokens (testing)
+BEARER_TOKEN_VALIDATION=valid
+
+# Always reject bearer tokens (testing)
+BEARER_TOKEN_VALIDATION=invalid
+
+# Validate as JWT (production)
+BEARER_TOKEN_VALIDATION=jwt
+```
+
+### Authentication Priority
+
+The system uses this priority order:
+1. **Bearer token** (from `Authorization: Bearer <token>` header)
+2. **OAuth session** (existing user with valid tokens)
+3. **Device flow initiation** (for new users)
+
+### Dual Authentication Status
+
+Check authentication capabilities:
+
+```bash
+curl http://localhost:8001/auth/dual-status
+```
+
+Response includes:
+- Supported authentication methods
+- Current authentication status
+- Bearer token validation mode
+- Environment testing configuration
 
 ## 🔧 Customization Guide
 

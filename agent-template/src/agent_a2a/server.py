@@ -116,6 +116,9 @@ class AuthenticatedA2AServer:
             Route("/auth/status", endpoint=self._handle_auth_status, methods=["GET"]),
             Route("/auth/revoke", endpoint=self._handle_auth_revoke, methods=["POST"]),
 
+            # Dual authentication status (includes bearer token support)
+            Route("/auth/dual-status", endpoint=self._handle_dual_auth_status, methods=["GET", "POST"]),
+
             # Health check
             Route("/health", endpoint=self._handle_health, methods=["GET"]),
         ]
@@ -221,13 +224,23 @@ class AuthenticatedA2AServer:
             logger.error(f"Token revocation failed: {e}")
             return JSONResponse({"error": str(e)}, status_code=500)
 
+    async def _handle_dual_auth_status(self, request: Request) -> Response:
+        """Handle dual authentication status check (bearer token + OAuth)."""
+        return await self.request_handler.handle_auth_status(request)
+
     async def _handle_health(self, request: Request) -> Response:
         """Handle health check."""
+        auth_status = self.request_handler.get_auth_status()
         return JSONResponse({
             "status": "healthy",
             "agent": self.agent.name,
             "version": self.agent_card.version,
-            "authentication": "enabled"
+            "authentication": {
+                "enabled": True,
+                "dual_auth": auth_status["dual_authentication_enabled"],
+                "methods": auth_status["supported_methods"],
+                "bearer_validation": auth_status["bearer_token_validation"]
+            }
         })
 
     def build(self) -> Starlette:
