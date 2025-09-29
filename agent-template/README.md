@@ -19,6 +19,7 @@ This template provides a complete foundation for creating OAuth-authenticated AI
 - **🔄 Token Management**: Automatic refresh, secure storage, lifecycle management
 - **📋 Template Structure**: Easy to customize for your specific agent needs
 - **🔀 Bearer Token Support**: Accept pre-authenticated tokens from web apps/orchestrators
+- **🧪 Comprehensive Testing**: Built-in test suite for bearer token forwarding and A2A protocol
 
 ## 🏗️ Template Architecture
 
@@ -187,8 +188,9 @@ curl -X POST http://localhost:8001/ \
     "method": "message/send",
     "params": {
       "message": {
+        "messageId": "msg-1",
         "role": "user",
-        "content": [{"text": "Hello from web app"}]
+        "parts": [{"text": "Hello from web app"}]
       }
     }
   }'
@@ -213,8 +215,9 @@ curl -X POST http://localhost:8001/ \
     "method": "message/send",
     "params": {
       "message": {
+        "messageId": "msg-2",
         "role": "user",
-        "content": [{"text": "Hello from OAuth user"}]
+        "parts": [{"text": "Hello from OAuth user"}]
       }
     },
     "user_id": "user@example.com"
@@ -350,7 +353,75 @@ Create environment-specific `.env` files:
 
 ## 🧪 Testing
 
-### Using the Test Client
+### Bearer Token Forwarding Test
+
+The template includes comprehensive testing for bearer token forwarding functionality:
+
+#### Quick Bearer Token Test
+
+```bash
+# 1. Set up the test environment
+./setup_bearer_token_test.sh
+
+# 2. Start the main agent (Terminal 1)
+source venv/bin/activate && python3 src/agent.py
+
+# 3. Start the remote test agent (Terminal 2)
+source venv/bin/activate && python3 test_remote_agent.py
+
+# 4. Run comprehensive bearer token test (Terminal 3)
+source venv/bin/activate && python3 bearer_token_test_client.py
+```
+
+#### What the Bearer Token Test Validates
+
+1. **✅ Health Checks**: Both main and remote agents are running
+2. **✅ Dual Auth Status**: Bearer token + OAuth authentication is enabled
+3. **✅ Token to Tools**: Bearer tokens are forwarded to agent tools
+4. **✅ Token to Remote Agents**: Bearer tokens are forwarded via A2A protocol
+5. **✅ Invalid Token Handling**: Proper 401 responses for unauthenticated requests
+
+#### Test Results Example
+
+```bash
+📊 TEST RESULTS
+🎯 Overall Success: True
+📈 Success Rate: 100.0%
+✅ Passed Tests: 5
+❌ Failed Tests: 0
+
+📋 Test Details:
+  ✅ PASS health_checks
+  ✅ PASS dual_auth_status
+  ✅ PASS token_to_tools
+  ✅ PASS token_to_remote_agent
+  ✅ PASS invalid_token_handling
+```
+
+#### Manual Bearer Token Testing
+
+```bash
+# Test bearer token with the built-in test tool
+curl -X POST http://localhost:8001/ \
+  -H "Authorization: Bearer test-token-123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "test-1",
+    "method": "message/send",
+    "params": {
+      "message": {
+        "messageId": "test-msg-1",
+        "role": "user",
+        "parts": [{"text": "Please use the bearer_token_print_tool to analyze my bearer token"}]
+      }
+    }
+  }'
+```
+
+### OAuth Testing
+
+#### Using the Test Client
 
 ```python
 # oauth_test_client.py
@@ -449,7 +520,8 @@ When creating your agent from this template:
 - ✅ **Skills Definition**: Define your agent's capabilities
 - ✅ **Provider Configuration**: Add any additional OAuth providers
 - ✅ **Environment Setup**: Configure for your deployment environment
-- ✅ **Testing**: Verify OAuth flow and tool execution
+- ✅ **Bearer Token Testing**: Run `./setup_bearer_token_test.sh` and test suite
+- ✅ **OAuth Testing**: Verify OAuth flow and tool execution
 - ✅ **Documentation**: Update README with your agent's specifics
 
 ## 🔧 Advanced Configuration

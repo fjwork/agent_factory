@@ -25,7 +25,7 @@ from google.adk.tools import FunctionTool
 from auth.auth_config import load_auth_config
 from agent_a2a.server import create_authenticated_a2a_server
 from tools.authenticated_tool import AuthenticatedTool
-from tools.example_tool import ExampleTool
+from tools.example_tool import ExampleTool, BearerTokenPrintTool
 
 # Configure logging
 logging.basicConfig(
@@ -50,11 +50,13 @@ def create_agent() -> Agent:
 
     logger.info(f"Creating agent: {agent_name} (env: {environment})")
 
-    # Create example tool (customize this section for your specific agent)
+    # Create tools (customize this section for your specific agent)
     example_tool = ExampleTool()
+    bearer_token_print_tool = BearerTokenPrintTool()
 
     # Convert to FunctionTool for ADK - tools will access user context from session state
     example_function_tool = FunctionTool(example_tool.execute_with_context)
+    bearer_token_print_function_tool = FunctionTool(bearer_token_print_tool.execute_with_context)
 
     # Create agent
     agent = Agent(
@@ -79,17 +81,19 @@ When users need authenticated services:
 
 Available tools:
 - example_tool: Example authenticated tool (customize for your needs)
+- bearer_token_print_tool: Testing tool that prints received bearer token information
 
 Example requests you can handle:
 - "Help me access my authenticated data"
 - "What can you do with my authentication?"
 - "Show me my information"
+- "Print my bearer token" (for testing token forwarding)
 
 Always be helpful, secure, and transparent about what information you can access.
 
 Note: This is a template agent. Customize the tools and instructions for your specific use case.
         """,
-        tools=[example_function_tool],
+        tools=[example_function_tool, bearer_token_print_function_tool],
         description=f"{agent_name} with OAuth authentication and A2A protocol support"
     )
 

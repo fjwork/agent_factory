@@ -120,11 +120,19 @@ class ExampleTool(AuthenticatedTool):
             Formatted response
         """
         # Get user context from session state
+        session_state = tool_context.state or {}
+
+        # Handle State object vs dict
+        if hasattr(session_state, '__dict__'):
+            state_dict = vars(session_state)
+        else:
+            state_dict = session_state
+
         user_context = {
-            "user_id": tool_context.state.get("oauth_user_id"),
-            "provider": tool_context.state.get("oauth_provider"),
-            "user_info": tool_context.state.get("oauth_user_info", {}),
-            "token": tool_context.state.get("oauth_token")
+            "user_id": state_dict.get("oauth_user_id"),
+            "provider": state_dict.get("oauth_provider"),
+            "user_info": state_dict.get("oauth_user_info", {}),
+            "token": state_dict.get("oauth_token")
         }
 
         # If session state doesn't have OAuth context, try global registry fallback
@@ -180,4 +188,148 @@ class ExampleTool(AuthenticatedTool):
             return {
                 "success": False,
                 "error": f"Tool execution failed: {str(e)}"
+            }
+
+
+class BearerTokenPrintTool(AuthenticatedTool):
+    """Tool specifically for testing bearer token forwarding."""
+
+    def __init__(self):
+        super().__init__(
+            name="bearer_token_print_tool",
+            description="Prints received bearer token for testing token forwarding functionality"
+        )
+
+    async def execute_authenticated(
+        self,
+        user_context: Dict[str, Any],
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Print bearer token information for testing.
+
+        Args:
+            user_context: User authentication context
+            **kwargs: Additional parameters (ignored)
+
+        Returns:
+            Detailed bearer token information
+        """
+        if not self.validate_user_context(user_context):
+            raise AuthenticationError("Invalid user authentication context")
+
+        self._log_tool_execution(user_context, "bearer_token_print")
+
+        # Extract all authentication information
+        user_id = self.get_user_id(user_context)
+        provider = self.get_provider(user_context)
+        auth_type = user_context.get("auth_type", "unknown")
+        token = user_context.get("token")
+
+        # Create detailed token analysis
+        token_info = {
+            "present": bool(token),
+            "type": type(token).__name__ if token else "None",
+            "length": len(str(token)) if token else 0,
+            "first_chars": str(token)[:20] + "..." if token and len(str(token)) > 20 else str(token) if token else None,
+            "last_chars": "..." + str(token)[-10:] if token and len(str(token)) > 30 else None
+        }
+
+        # Check for JWT structure
+        if token and isinstance(token, str) and "." in token:
+            parts = token.split(".")
+            token_info["jwt_structure"] = {
+                "parts": len(parts),
+                "header_length": len(parts[0]) if len(parts) > 0 else 0,
+                "payload_length": len(parts[1]) if len(parts) > 1 else 0,
+                "signature_length": len(parts[2]) if len(parts) > 2 else 0,
+                "likely_jwt": len(parts) == 3
+            }
+
+        return {
+            "success": True,
+            "tool": "bearer_token_print_tool",
+            "message": "🔍 Bearer Token Analysis Complete",
+            "user_authentication": {
+                "user_id": user_id,
+                "provider": provider,
+                "auth_type": auth_type,
+                "authenticated": user_context.get("authenticated", False)
+            },
+            "bearer_token": token_info,
+            "full_user_context_keys": list(user_context.keys()),
+            "timestamp": self._get_timestamp(),
+            "test_result": "✅ Bearer token successfully forwarded to tool!" if token else "❌ No bearer token received in tool"
+        }
+
+    async def execute_with_context(
+        self,
+        tool_context: ToolContext,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Execute bearer token print using ADK ToolContext.
+
+        Args:
+            tool_context: ADK ToolContext with session state
+            **kwargs: Additional parameters
+
+        Returns:
+            Bearer token analysis
+        """
+        # Get authentication context from session state
+        session_state = tool_context.state or {}
+
+        # Handle State object vs dict
+        if hasattr(session_state, '__dict__'):
+            # Convert State object to dict for easier access
+            state_dict = vars(session_state)
+        else:
+            state_dict = session_state
+
+        # Extract OAuth/bearer token information from session
+        user_context = {
+            "user_id": state_dict.get("oauth_user_id"),
+            "provider": state_dict.get("oauth_provider", "unknown"),
+            "user_info": state_dict.get("oauth_user_info", {}),
+            "token": state_dict.get("oauth_token"),
+            "auth_type": "bearer",  # Assume bearer since we're testing bearer token forwarding
+            "authenticated": state_dict.get("oauth_authenticated", False)
+        }
+
+        # Add session state debugging information
+        session_debug = {
+            "state_type": type(session_state).__name__,
+            "session_keys": list(state_dict.keys()) if state_dict else [],
+            "oauth_user_id": state_dict.get("oauth_user_id"),
+            "oauth_provider": state_dict.get("oauth_provider"),
+            "oauth_token_present": bool(state_dict.get("oauth_token")),
+            "oauth_authenticated": state_dict.get("oauth_authenticated")
+        }
+
+        logger.info(f"🔍 Bearer Token Print Tool - Session Debug: {session_debug}")
+
+        # Check if we have bearer token in session
+        if not user_context["user_id"] or not user_context["token"]:
+            return {
+                "success": False,
+                "tool": "bearer_token_print_tool",
+                "error": "No bearer token found in session state",
+                "session_debug": session_debug,
+                "message": "❌ Bearer token was not forwarded to tool session state",
+                "timestamp": self._get_timestamp()
+            }
+
+        # Call the authenticated method with extracted context
+        try:
+            result = await self.execute_authenticated(user_context, **kwargs)
+            result["session_debug"] = session_debug
+            return result
+        except Exception as e:
+            return {
+                "success": False,
+                "tool": "bearer_token_print_tool",
+                "error": f"Bearer token analysis failed: {str(e)}",
+                "session_debug": session_debug,
+                "timestamp": self._get_timestamp()
             }
