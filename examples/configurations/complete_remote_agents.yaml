@@ -1,0 +1,33 @@
+# Complete Remote Agents Configuration
+#
+# This configuration includes all available remote agents for full
+# multi-agent orchestration capabilities.
+
+remote_agents:
+  # Data Analysis Agent - Handles complex data processing and visualization
+  - name: "data_analysis_agent"
+    description: "Handles complex data analysis, statistical computations, data visualization, and reporting tasks"
+    agent_card_url: "http://localhost:8002/a2a/data_analysis_agent"
+    enabled: true
+
+  # Notification Agent - Manages communications and alerts
+  - name: "notification_agent"
+    description: "Sends notifications, alerts, emails, SMS, and handles all communication tasks"
+    agent_card_url: "http://localhost:8003/a2a/notification_agent"
+    enabled: true
+
+  # Approval Agent - Handles workflow approvals and human-in-the-loop processes
+  - name: "approval_agent"
+    description: "Handles approval workflows, human-in-the-loop processes, and escalation management"
+    agent_card_url: "http://localhost:8004/a2a/approval_agent"
+    enabled: true
+
+# Configuration Notes:
+# - Set enabled: false to disable a specific agent without removing its configuration
+# - agent_card_url should point to the base A2A endpoint (/.well-known/agent-card.json will be appended automatically)
+# - Each agent should run on a different port to avoid conflicts
+# - Authentication context is automatically forwarded when delegating tasks
+
+# To disable all remote agents:
+# Comment out the entire remote_agents section or set it to an empty list:
+# remote_agents: []

@@ -9,7 +9,7 @@ import sys
 import asyncio
 import logging
 import uvicorn
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -26,6 +26,7 @@ from auth.auth_config import load_auth_config
 from agent_a2a.server import create_authenticated_a2a_server
 from tools.authenticated_tool import AuthenticatedTool
 from tools.example_tool import ExampleTool, BearerTokenPrintTool
+from agent_factory.remote_agent_factory import RemoteAgentFactory
 
 # Configure logging
 logging.basicConfig(
@@ -37,8 +38,8 @@ logger = logging.getLogger(__name__)
 
 
 
-def create_agent() -> Agent:
-    """Create an OAuth-authenticated agent with customizable tools."""
+async def create_agent() -> Agent:
+    """Create an OAuth-authenticated agent with optional remote agents."""
 
     # Load configuration
     auth_config = load_auth_config()
@@ -58,11 +59,40 @@ def create_agent() -> Agent:
     example_function_tool = FunctionTool(example_tool.execute_with_context)
     bearer_token_print_function_tool = FunctionTool(bearer_token_print_tool.execute_with_context)
 
-    # Create agent
+    tools = [example_function_tool, bearer_token_print_function_tool]
+
+    # Load remote agents if configured (optional)
+    config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
+    remote_factory = RemoteAgentFactory(config_dir)
+    remote_agents = await remote_factory.load_remote_agents_if_configured()
+
+    # Build dynamic instruction based on available remote agents
+    instruction = _build_agent_instruction(agent_name, remote_agents)
+
+    # Create agent with optional sub-agents
     agent = Agent(
         model=model_name,
         name=agent_name,
-        instruction=f"""
+        instruction=instruction,
+        tools=tools,
+        sub_agents=remote_agents if remote_agents else None,  # Only add if configured
+        description=f"{agent_name} with OAuth authentication and A2A protocol support"
+    )
+
+    # Log agent creation details
+    if remote_agents:
+        logger.info(f"✅ Created agent with {len(remote_agents)} remote sub-agents:")
+        for remote_agent in remote_agents:
+            logger.info(f"   - {remote_agent.name}: {remote_agent.description}")
+    else:
+        logger.info("✅ Created agent in standalone mode (no remote agents)")
+
+    return agent
+
+
+def _build_agent_instruction(agent_name: str, remote_agents: List) -> str:
+    """Build dynamic instruction based on available remote agents."""
+    base_instruction = f"""
 You are {agent_name}, an AI assistant with secure OAuth authentication capabilities.
 
 Your primary purpose is to help users access authenticated services and information safely and securely.
@@ -81,7 +111,43 @@ When users need authenticated services:
 
 Available tools:
 - example_tool: Example authenticated tool (customize for your needs)
-- bearer_token_print_tool: Testing tool that prints received bearer token information
+- bearer_token_print_tool: Testing tool that prints received bearer token information"""
+
+    if remote_agents:
+        delegation_instruction = f"""
+
+🤖 Remote Agent Delegation:
+You can delegate specialized tasks to the following remote agents. Authentication context will be automatically forwarded.
+
+Available remote agents:"""
+
+        for agent in remote_agents:
+            delegation_instruction += f"""
+- {agent.name}: {agent.description}"""
+
+        delegation_instruction += """
+
+When delegating to remote agents:
+1. Choose the most appropriate agent for the task based on their descriptions
+2. Provide clear and specific task instructions
+3. Authentication context (bearer tokens, OAuth) will be automatically forwarded
+4. You can delegate complex tasks that require specialized capabilities
+
+Example delegation requests:
+- "Delegate this data analysis to the data_analysis_agent"
+- "Send a notification using the notification_agent"
+- "Route this approval request to the approval_agent"
+"""
+
+        base_instruction += delegation_instruction
+    else:
+        standalone_note = """
+
+Operating Mode: Standalone (no remote agents configured)
+You handle all requests directly using your available tools."""
+        base_instruction += standalone_note
+
+    base_instruction += """
 
 Example requests you can handle:
 - "Help me access my authenticated data"
@@ -92,12 +158,9 @@ Example requests you can handle:
 Always be helpful, secure, and transparent about what information you can access.
 
 Note: This is a template agent. Customize the tools and instructions for your specific use case.
-        """,
-        tools=[example_function_tool, bearer_token_print_function_tool],
-        description=f"{agent_name} with OAuth authentication and A2A protocol support"
-    )
+"""
 
-    return agent
+    return base_instruction
 
 
 def main():
@@ -110,8 +173,8 @@ def main():
 
         logger.info(f"Starting agent in {environment} environment")
 
-        # Create agent
-        agent = create_agent()
+        # Create agent (now async)
+        agent = asyncio.run(create_agent())
 
         # Create authenticated A2A server
         server = create_authenticated_a2a_server(
@@ -159,7 +222,7 @@ def create_app():
     """Create app for uvicorn."""
     try:
         environment = os.getenv("ENVIRONMENT", "development")
-        agent = create_agent()
+        agent = asyncio.run(create_agent())
 
         server = create_authenticated_a2a_server(
             agent=agent,

@@ -1,28 +1,42 @@
-# Agent Template - OAuth-Authenticated AI Agent
+# Agent Template - Multi-Agent OAuth-Authenticated AI Agent
 
-A **production-ready** template for building Google ADK (Agent Development Kit) agents with OAuth authentication and A2A (Agent-to-Agent) protocol integration.
+A **production-ready** template for building Google ADK (Agent Development Kit) agents with OAuth authentication, A2A (Agent-to-Agent) protocol integration, and **optional remote agent orchestration**.
 
 ## 🎯 Overview
 
-This template provides a complete foundation for creating OAuth-authenticated AI agents with enterprise-grade security and real API integration. Built on Google ADK with working OAuth flows and authentication patterns proven in production.
+This template provides a complete foundation for creating OAuth-authenticated AI agents with enterprise-grade security, real API integration, and **optional multi-agent capabilities**. Built on Google ADK with working OAuth flows, authentication patterns, and multi-agent orchestration proven in production.
 
-**Status**: ✅ **PRODUCTION READY** - Full OAuth flows working end-to-end with live API integration.
+**Status**: ✅ **PRODUCTION READY** - Full OAuth flows, bearer token forwarding, and multi-agent orchestration working end-to-end.
 
 ## ✨ Key Features
 
-- **🔐 Dual Authentication Support**: Bearer token + OAuth device flow authentication
-- **🌐 Multi-Provider Support**: Google, Azure AD, Okta, and custom identity providers
-- **🛡️ Enterprise Security**: Token encryption, HTTPS enforcement, JWT validation
-- **📡 A2A Protocol**: Full Agent-to-Agent protocol with authentication forwarding
-- **🤖 Google ADK Integration**: Native Gemini model integration with tool execution
-- **📊 Real API Integration**: Live data from OAuth provider APIs
-- **🔄 Token Management**: Automatic refresh, secure storage, lifecycle management
-- **📋 Template Structure**: Easy to customize for your specific agent needs
-- **🔀 Bearer Token Support**: Accept pre-authenticated tokens from web apps/orchestrators
-- **🧪 Comprehensive Testing**: Built-in test suite for bearer token forwarding and A2A protocol
+### 🔐 Authentication & Security
+- **Dual Authentication Support**: Bearer token + OAuth device flow authentication
+- **Multi-Provider Support**: Google, Azure AD, Okta, and custom identity providers
+- **Enterprise Security**: Token encryption, HTTPS enforcement, JWT validation
+- **Authentication Forwarding**: Bearer tokens and OAuth context preserved across agent boundaries
+
+### 🤖 Agent Capabilities
+- **Optional Remote Agents**: Seamlessly switch between standalone and multi-agent modes
+- **Multi-Agent Orchestration**: Delegate specialized tasks to remote agents with automatic auth forwarding
+- **Google ADK Integration**: Native Gemini model integration with tool execution
+- **A2A Protocol**: Full Agent-to-Agent protocol with official ADK patterns
+
+### 🏗️ Architecture & Integration
+- **Flexible Deployment**: Standalone agent or multi-agent orchestrator based on configuration
+- **Real API Integration**: Live data from OAuth provider APIs
+- **Token Management**: Automatic refresh, secure storage, lifecycle management
+- **Template Structure**: Easy to customize for your specific agent needs
+
+### 🧪 Testing & Quality
+- **Comprehensive Testing**: Complete test suite for standalone, multi-agent, and auth forwarding scenarios
+- **Modular Test Scripts**: Separate tests for root agent, individual remote agents, and end-to-end workflows
+- **Authentication Verification**: Tests bearer token and OAuth context forwarding across agent boundaries
+- **Production Documentation**: Complete setup guides, configuration examples, and troubleshooting
 
 ## 🏗️ Template Architecture
 
+### Standalone Mode (Default)
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                  Your Custom Agent                         │
@@ -40,12 +54,42 @@ This template provides a complete foundation for creating OAuth-authenticated AI
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### Multi-Agent Mode (Optional)
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Root Agent (Orchestrator)               │
+│                                                             │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐  │
+│  │   Agent Core    │  │  OAuth System   │  │ A2A Server  │  │
+│  │ + Remote Agents │  │ + Auth Forward  │  │+ Agent Cards│  │
+│  └─────────┬───────┘  └─────────────────┘  └─────────────┘  │
+└───────────┼─────────────────────────────────────────────────┘
+            │ A2A + Auth Forwarding
+            ▼
+┌───────────────────────────────────────────────────────────────┐
+│        🔗 Remote Specialized Agents (Optional)               │
+│                                                               │
+│ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐   │
+│ │ Data Analysis   │ │ Notification    │ │ Approval        │   │
+│ │ Agent           │ │ Agent           │ │ Agent           │   │
+│ │ (Port 8002)     │ │ (Port 8003)     │ │ (Port 8004)     │   │
+│ └─────────────────┘ └─────────────────┘ └─────────────────┘   │
+│                                                               │
+│ • Statistical Analysis    • Email/SMS/Slack      • Workflow Approvals │
+│ • Data Visualization     • Push Notifications    • Human-in-the-Loop  │
+│ • Reporting              • Alert Management      • Escalation         │
+└───────────────────────────────────────────────────────────────┘
+```
+
 ## 📁 Project Structure
 
 ```
 agent-template/
 ├── src/
-│   ├── agent.py                          # Main entry point - create_agent()
+│   ├── agent.py                          # Main entry point - create_agent() with optional remote agents
+│   ├── agent_factory/                    # Remote agent management
+│   │   ├── __init__.py                   # Module initialization
+│   │   └── remote_agent_factory.py      # RemoteAgentFactory for optional loading
 │   ├── auth/                             # OAuth authentication system
 │   │   ├── oauth_middleware.py           # OAuthMiddleware class
 │   │   ├── credential_store.py           # Token storage (Memory/File/SecretManager)
@@ -58,14 +102,73 @@ agent-template/
 │       ├── authenticated_tool.py        # AuthenticatedTool base class
 │       ├── example_tool.py             # ExampleTool implementation
 │       └── examples/                   # Additional example tools
-├── config/                              # Configuration files
+├── config/
 │   ├── agent_config.yaml              # Agent settings and capabilities
-│   └── oauth_config.yaml              # OAuth provider configuration
-├── oauth_test_client.py                # OAuth test client
-└── README.md                           # This file
+│   ├── oauth_config.yaml              # OAuth provider configuration
+│   └── remote_agents.yaml             # Optional remote agents configuration
+├── testing/                            # Complete testing framework
+│   ├── README.md                       # Testing documentation
+│   ├── test_root_agent.py             # Root agent tests (standalone + multi-agent)
+│   ├── test_auth_forwarding.py        # End-to-end authentication forwarding tests
+│   ├── test_remote_agents/            # Individual remote agent tests
+│   │   ├── test_data_analysis_agent.py
+│   │   ├── test_notification_agent.py
+│   │   └── test_approval_agent.py
+│   ├── remote_agents/                 # Sample remote agents for testing
+│   │   ├── data_analysis_agent/       # Data analysis and reporting
+│   │   ├── notification_agent/        # Multi-channel notifications
+│   │   └── approval_agent/            # Workflow approvals
+│   └── utils/                         # Testing utilities
+│       ├── test_client.py             # AuthenticatedTestClient
+│       └── auth_test_utils.py         # Authentication testing helpers
+├── examples/                          # Documentation and setup guides
+│   ├── standalone_setup.md            # Single agent setup guide
+│   ├── multi_agent_setup.md           # Multi-agent setup guide
+│   ├── troubleshooting.md             # Comprehensive troubleshooting guide
+│   └── configurations/                # Configuration examples
+│       ├── minimal_remote_agents.yaml
+│       ├── complete_remote_agents.yaml
+│       ├── development_remote_agents.yaml
+│       ├── production_remote_agents.yaml
+│       └── environment_examples.md
+├── IMPLEMENTATION_STRATEGY.md         # Complete implementation progress tracking
+├── oauth_test_client.py              # OAuth test client
+└── README.md                         # This file
 ```
 
 ## 🚀 Quick Start
+
+### Choose Your Deployment Mode
+
+The agent-template supports two deployment modes:
+
+#### 🎯 **Standalone Mode** (Default)
+Perfect for single-agent scenarios:
+- No configuration needed - works out of the box
+- Single agent with OAuth authentication
+- All tools execute within the main agent
+- Ideal for: Simple use cases, development, single-domain tasks
+
+#### 🔗 **Multi-Agent Mode** (Optional)
+Advanced multi-agent orchestration:
+- Configure `config/remote_agents.yaml` to enable
+- Root agent delegates to specialized remote agents
+- Authentication automatically forwarded across agents
+- Ideal for: Complex workflows, specialized tasks, enterprise scenarios
+
+```bash
+# Standalone mode (default)
+python src/agent.py
+# ✅ Single agent on port 8001
+
+# Multi-agent mode
+cp examples/configurations/complete_remote_agents.yaml config/remote_agents.yaml
+python src/agent.py                                    # Root agent (port 8001)
+python testing/remote_agents/data_analysis_agent/src/agent.py    # Optional (port 8002)
+python testing/remote_agents/notification_agent/src/agent.py     # Optional (port 8003)
+python testing/remote_agents/approval_agent/src/agent.py         # Optional (port 8004)
+# ✅ Multi-agent system with specialized capabilities
+```
 
 ### 1. Prerequisites
 
@@ -351,7 +454,179 @@ Create environment-specific `.env` files:
 |----------|--------|---------|
 | `/health` | GET | Service health check |
 
+## 🔗 Multi-Agent Capabilities
+
+### Remote Agent Overview
+
+The template includes three sample remote agents that demonstrate different specialization patterns:
+
+#### 📊 Data Analysis Agent (Port 8002)
+Specialized for data processing and analytics:
+- **Capabilities**: Statistical analysis, data visualization, trend analysis, forecasting
+- **Use Cases**: Sales data analysis, user behavior analytics, custom reporting
+- **Authentication**: Receives and verifies bearer tokens and OAuth context
+- **Tools**: `DataAnalysisTool` with mock datasets and analysis types
+
+#### 🔔 Notification Agent (Port 8003)
+Handles all communication and alerting:
+- **Capabilities**: Multi-channel notifications (email, SMS, Slack, push)
+- **Use Cases**: Alert management, notification delivery, communication workflows
+- **Authentication**: Auth context verification for user-specific notifications
+- **Tools**: `NotificationTool` with mock provider integration
+
+#### ✋ Approval Agent (Port 8004)
+Manages workflows and human-in-the-loop processes:
+- **Capabilities**: Approval workflows, escalation management, human oversight
+- **Use Cases**: Document approvals, expense workflows, access requests
+- **Authentication**: Auth context for approval authority verification
+- **Tools**: `ApprovalTool` with workflow state management
+
+### Multi-Agent Workflow Example
+
+```bash
+# User request with authentication
+curl -X POST http://localhost:8001/a2a \
+  -H "Authorization: Bearer your-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "workflow-1",
+    "method": "message/send",
+    "params": {
+      "message": {
+        "messageId": "msg-1",
+        "role": "user",
+        "parts": [{
+          "text": "Please analyze our Q4 sales data, send a summary to the team, and request approval for the budget increase"
+        }]
+      }
+    }
+  }'
+
+# Root agent automatically:
+# 1. Delegates analysis to Data Analysis Agent
+# 2. Forwards authentication context via A2A
+# 3. Delegates notification to Notification Agent
+# 4. Delegates approval to Approval Agent
+# 5. Coordinates the complete workflow
+```
+
+### Authentication Forwarding
+
+All authentication information is automatically forwarded to remote agents:
+
+- **Bearer Tokens**: Preserved in session state and forwarded via A2A protocol
+- **OAuth Context**: User information, provider details, and tokens maintained
+- **Session State**: Complete authentication context available to remote agents
+- **Verification**: Each remote agent can verify and extract auth information
+
+```python
+# Remote agents automatically receive auth context
+def _extract_auth_info(self, state_dict: Dict[str, Any]) -> Dict[str, Any]:
+    # Check for OAuth context
+    if state_dict.get("oauth_authenticated"):
+        return {
+            "authenticated": True,
+            "auth_type": "oauth",
+            "user_id": state_dict.get("oauth_user_id"),
+            "oauth_context": {...}
+        }
+    # Check for bearer token
+    elif state_dict.get("oauth_token"):
+        return {
+            "authenticated": True,
+            "auth_type": "bearer",
+            "token_present": True
+        }
+```
+
+### Configuration Management
+
+#### Enable Multi-Agent Mode
+
+```yaml
+# config/remote_agents.yaml
+remote_agents:
+  - name: "data_analysis_agent"
+    description: "Handles complex data analysis and reporting"
+    agent_card_url: "http://localhost:8002/a2a/data_analysis_agent"
+    enabled: true
+
+  - name: "notification_agent"
+    description: "Manages notifications and communications"
+    agent_card_url: "http://localhost:8003/a2a/notification_agent"
+    enabled: true
+
+  - name: "approval_agent"
+    description: "Handles approval workflows"
+    agent_card_url: "http://localhost:8004/a2a/approval_agent"
+    enabled: false  # Can disable individual agents
+```
+
+#### Example Configurations
+
+- **`examples/configurations/minimal_remote_agents.yaml`**: Single data analysis agent
+- **`examples/configurations/complete_remote_agents.yaml`**: All three sample agents
+- **`examples/configurations/development_remote_agents.yaml`**: Development/testing setup
+- **`examples/configurations/production_remote_agents.yaml`**: Production deployment
+
+### Custom Remote Agents
+
+Create your own specialized agents:
+
+```python
+# my_custom_agent/src/agent.py
+from google.adk.agents import Agent
+from google.adk.a2a.utils.agent_to_a2a import to_a2a
+
+def create_custom_agent():
+    agent = Agent(
+        model="gemini-2.0-flash",
+        name="my_custom_agent",
+        instruction="Your custom agent instructions...",
+        tools=[your_custom_tools]
+    )
+    return agent
+
+def create_custom_a2a_app(port=8005):
+    agent = create_custom_agent()
+    return to_a2a(agent, port=port)
+
+# Add to config/remote_agents.yaml
+# - name: "my_custom_agent"
+#   description: "Your custom functionality"
+#   agent_card_url: "http://localhost:8005/a2a/my_custom_agent"
+#   enabled: true
+```
+
 ## 🧪 Testing
+
+### Multi-Agent Testing Framework
+
+The template includes comprehensive testing for both standalone and multi-agent modes:
+
+#### Root Agent Tests
+```bash
+# Test both standalone and multi-agent modes
+python testing/test_root_agent.py
+```
+
+#### Individual Remote Agent Tests
+```bash
+# Test each remote agent independently
+python testing/test_remote_agents/test_data_analysis_agent.py
+python testing/test_remote_agents/test_notification_agent.py
+python testing/test_remote_agents/test_approval_agent.py
+```
+
+#### End-to-End Authentication Forwarding Tests
+```bash
+# Start root agent first
+python src/agent.py
+
+# Test complete auth forwarding workflows
+python testing/test_auth_forwarding.py
+```
 
 ### Bearer Token Forwarding Test
 
@@ -511,8 +786,7 @@ logging.getLogger('agent_a2a.handlers').setLevel(logging.DEBUG)
 
 ## 📋 Template Checklist
 
-When creating your agent from this template:
-
+### Core Setup
 - ✅ **OAuth Configuration**: Update client ID/secret in `.env`
 - ✅ **Agent Details**: Customize name, description in `config/agent_config.yaml`
 - ✅ **Custom Tools**: Replace `example_tool.py` with your tools
@@ -520,9 +794,26 @@ When creating your agent from this template:
 - ✅ **Skills Definition**: Define your agent's capabilities
 - ✅ **Provider Configuration**: Add any additional OAuth providers
 - ✅ **Environment Setup**: Configure for your deployment environment
-- ✅ **Bearer Token Testing**: Run `./setup_bearer_token_test.sh` and test suite
+
+### Multi-Agent Setup (Optional)
+- ✅ **Deployment Mode**: Choose standalone or multi-agent mode
+- ✅ **Remote Agents Configuration**: Configure `config/remote_agents.yaml` if using multi-agent mode
+- ✅ **Custom Remote Agents**: Create domain-specific remote agents if needed
+- ✅ **Authentication Forwarding**: Verify auth context forwarding to remote agents
+- ✅ **Multi-Agent Testing**: Test complete workflows across agents
+
+### Testing & Validation
+- ✅ **Standalone Testing**: Run `python testing/test_root_agent.py`
+- ✅ **Multi-Agent Testing**: Run individual remote agent tests if applicable
+- ✅ **Bearer Token Testing**: Test authentication forwarding across agents
 - ✅ **OAuth Testing**: Verify OAuth flow and tool execution
+- ✅ **End-to-End Testing**: Run `python testing/test_auth_forwarding.py`
+
+### Documentation & Deployment
 - ✅ **Documentation**: Update README with your agent's specifics
+- ✅ **Configuration Examples**: Set up environment-specific configs
+- ✅ **Deployment Planning**: Choose deployment strategy (local, cloud, containerized)
+- ✅ **Monitoring Setup**: Configure logging and health checks
 
 ## 🔧 Advanced Configuration
 
@@ -552,6 +843,17 @@ async def call_external_api(self, user_context):
 
 ## 📖 Additional Resources
 
+### Setup and Configuration Guides
+- **[Standalone Setup Guide](examples/standalone_setup.md)**: Complete setup for single-agent deployment
+- **[Multi-Agent Setup Guide](examples/multi_agent_setup.md)**: Advanced multi-agent orchestration setup
+- **[Configuration Examples](examples/configurations/)**: Environment-specific configuration templates
+- **[Troubleshooting Guide](examples/troubleshooting.md)**: Comprehensive problem resolution guide
+
+### Testing and Development
+- **[Testing Documentation](testing/README.md)**: Complete testing framework documentation
+- **[Implementation Strategy](IMPLEMENTATION_STRATEGY.md)**: Detailed implementation progress and architecture
+
+### External Documentation
 - **Google ADK Documentation**: [Google ADK Guide](https://cloud.google.com/vertex-ai/generative-ai/docs/agent-development-kit)
 - **A2A Protocol Specification**: [Agent-to-Agent Protocol](https://docs.a2a.ai/)
 - **OAuth 2.0 Device Flow**: [RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628)

@@ -1,0 +1,63 @@
+# Production Remote Agents Configuration
+#
+# This configuration is designed for production environments with
+# HTTPS endpoints, load balancing, and security considerations.
+
+remote_agents:
+  # Data Analysis Service - Production cluster
+  - name: "data_analysis_agent"
+    description: "Production data analysis service with high availability and scalability"
+    agent_card_url: "https://data-analysis.yourdomain.com/a2a/data_analysis_agent"
+    enabled: true
+    timeout: 30  # Seconds
+    retry_count: 3
+    health_check_interval: 60  # Seconds
+
+  # Notification Service - Multi-channel communication hub
+  - name: "notification_agent"
+    description: "Enterprise notification service supporting email, SMS, Slack, and push notifications"
+    agent_card_url: "https://notifications.yourdomain.com/a2a/notification_agent"
+    enabled: true
+    timeout: 15
+    retry_count: 2
+    health_check_interval: 30
+
+  # Approval Workflow Service - Enterprise workflow management
+  - name: "approval_agent"
+    description: "Enterprise approval workflow service with SLA management and escalation"
+    agent_card_url: "https://approvals.yourdomain.com/a2a/approval_agent"
+    enabled: true
+    timeout: 45
+    retry_count: 3
+    health_check_interval: 60
+
+  # Custom Business Logic Agent - Domain-specific processing
+  - name: "business_logic_agent"
+    description: "Custom business logic processor for domain-specific operations"
+    agent_card_url: "https://business-logic.yourdomain.com/a2a/business_logic_agent"
+    enabled: false  # Disabled by default - enable when ready
+    timeout: 60
+    retry_count: 2
+    health_check_interval: 120
+
+# Production Configuration Notes:
+# 1. Use HTTPS for all agent communications
+# 2. Configure appropriate timeouts based on expected processing times
+# 3. Set retry counts to handle transient network issues
+# 4. Monitor health check intervals for proactive issue detection
+# 5. Use load balancers behind the agent URLs for high availability
+# 6. Implement proper SSL certificate validation
+# 7. Consider using service mesh for advanced traffic management
+
+# Security Considerations:
+# - Implement mutual TLS (mTLS) for agent-to-agent communication
+# - Use API keys or service tokens for additional authentication
+# - Enable request rate limiting and throttling
+# - Implement comprehensive audit logging
+# - Use network policies to restrict agent communication
+
+# Monitoring and Alerting:
+# - Set up health check monitoring for all agent endpoints
+# - Configure alerts for agent failures or high response times
+# - Implement distributed tracing for multi-agent workflows
+# - Monitor authentication context forwarding success rates

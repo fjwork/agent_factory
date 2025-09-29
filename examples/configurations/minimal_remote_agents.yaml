@@ -1,0 +1,11 @@
+# Minimal Remote Agents Configuration
+#
+# This configuration includes only the data analysis agent for simple
+# multi-agent scenarios.
+
+remote_agents:
+  # Data Analysis Agent - Essential for data processing tasks
+  - name: "data_analysis_agent"
+    description: "Handles data analysis, statistical computations, and reporting"
+    agent_card_url: "http://localhost:8002/a2a/data_analysis_agent"
+    enabled: true

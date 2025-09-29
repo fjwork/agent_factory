@@ -1,0 +1,70 @@
+# Development Remote Agents Configuration
+#
+# This configuration is optimized for development and testing environments
+# with debug options, local endpoints, and development-friendly settings.
+
+remote_agents:
+  # Data Analysis Agent - Development instance
+  - name: "data_analysis_agent"
+    description: "Development data analysis agent with debug logging and test data"
+    agent_card_url: "http://localhost:8002/a2a/data_analysis_agent"
+    enabled: true
+    debug_mode: true
+    log_level: "DEBUG"
+
+  # Notification Agent - Development instance with mock providers
+  - name: "notification_agent"
+    description: "Development notification agent with mock email/SMS providers"
+    agent_card_url: "http://localhost:8003/a2a/notification_agent"
+    enabled: true
+    debug_mode: true
+    mock_providers: true  # Use mock notification providers
+    log_level: "DEBUG"
+
+  # Approval Agent - Development instance with auto-approval for testing
+  - name: "approval_agent"
+    description: "Development approval agent with auto-approval for testing workflows"
+    agent_card_url: "http://localhost:8004/a2a/approval_agent"
+    enabled: true
+    debug_mode: true
+    auto_approve: true  # Automatically approve requests for testing
+    log_level: "DEBUG"
+
+  # Test Agent - For testing new features
+  - name: "test_agent"
+    description: "Experimental test agent for trying new features and capabilities"
+    agent_card_url: "http://localhost:8005/a2a/test_agent"
+    enabled: false  # Disabled by default - enable when testing new features
+    debug_mode: true
+    experimental: true
+    log_level: "DEBUG"
+
+# Development Configuration Notes:
+# - All agents run on localhost for easy development
+# - Debug mode enabled for detailed logging and troubleshooting
+# - Mock providers used to avoid external service dependencies
+# - Auto-approval enabled for testing workflow scenarios
+# - Experimental features can be safely tested
+
+# Development Environment Variables:
+# You may want to set these environment variables for development:
+# export LOG_LEVEL="DEBUG"
+# export DEVELOPMENT_MODE="true"
+# export MOCK_EXTERNAL_SERVICES="true"
+# export AUTO_APPROVE_WORKFLOWS="true"
+
+# Development Testing:
+# This configuration is designed to work with the test suite:
+# - python testing/test_root_agent.py
+# - python testing/test_remote_agents/test_*.py
+# - python testing/test_auth_forwarding.py
+
+# Hot Reloading:
+# For development, you can start agents with hot reloading:
+# uvicorn module.agent:app --reload --port 8002
+
+# Development Tools Integration:
+# - Compatible with VS Code debugging
+# - Works with pytest for automated testing
+# - Supports profiling and performance analysis
+# - Includes request/response logging for API debugging
