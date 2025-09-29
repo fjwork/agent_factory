@@ -1,0 +1,393 @@
+{
+  "test_started": 1759165074.9006238,
+  "test_token": "test-bearer-token-123456789-for-forwarding-test",
+  "tests": {
+    "health_checks": {
+      "main_agent": {
+        "status_code": 200,
+        "accessible": true,
+        "response": {
+          "status": "healthy",
+          "agent": "AuthenticatedAgent",
+          "version": "1.0.0",
+          "authentication": {
+            "enabled": true,
+            "dual_auth": true,
+            "methods": [
+              "bearer_token",
+              "oauth_device_flow"
+            ],
+            "bearer_validation": "valid"
+          }
+        }
+      },
+      "remote_agent": {
+        "status_code": 200,
+        "accessible": true,
+        "response": {
+          "status": "healthy",
+          "agent": "RemoteBearerTokenTestAgent",
+          "version": "1.0.0",
+          "authentication": {
+            "enabled": true,
+            "dual_auth": true,
+            "methods": [
+              "bearer_token",
+              "oauth_device_flow"
+            ],
+            "bearer_validation": "valid"
+          }
+        }
+      }
+    },
+    "dual_auth_status": {
+      "status_code": 200,
+      "accessible": true,
+      "response": {
+        "dual_authentication_enabled": true,
+        "supported_methods": [
+          "bearer_token",
+          "oauth_device_flow"
+        ],
+        "bearer_token_validation": "valid",
+        "oauth_device_flow_enabled": true,
+        "environment_testing": {
+          "bearer_valid_mode": true,
+          "bearer_invalid_mode": false
+        },
+        "current_authentication": {
+          "authenticated": false,
+          "message": "No valid authentication found"
+        }
+      }
+    },
+    "token_to_tools": {
+      "status_code": 200,
+      "request_headers": {
+        "Authorization": "Bearer test-bearer-token-123456789-for-forwarding-test",
+        "Content-Type": "application/json"
+      },
+      "request_payload": {
+        "jsonrpc": "2.0",
+        "id": "test-1",
+        "method": "message/send",
+        "params": {
+          "message": {
+            "messageId": "test-message-1",
+            "role": "user",
+            "parts": [
+              {
+                "text": "Please use the bearer_token_print_tool to analyze my bearer token"
+              }
+            ]
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": "test-1",
+        "result": {
+          "artifacts": null,
+          "contextId": "1e0d7f4e-a952-479f-b254-036e8376a62e",
+          "history": [
+            {
+              "contextId": "1e0d7f4e-a952-479f-b254-036e8376a62e",
+              "extensions": null,
+              "kind": "message",
+              "messageId": "test-message-1",
+              "metadata": null,
+              "parts": [
+                {
+                  "kind": "text",
+                  "metadata": null,
+                  "text": "Please use the bearer_token_print_tool to analyze my bearer token"
+                }
+              ],
+              "referenceTaskIds": null,
+              "role": "user",
+              "taskId": "f46a7d57-9114-442f-9fb6-f31fdaa721fd"
+            },
+            {
+              "contextId": "1e0d7f4e-a952-479f-b254-036e8376a62e",
+              "extensions": null,
+              "kind": "message",
+              "messageId": "test-message-1",
+              "metadata": null,
+              "parts": [
+                {
+                  "kind": "text",
+                  "metadata": null,
+                  "text": "Please use the bearer_token_print_tool to analyze my bearer token"
+                }
+              ],
+              "referenceTaskIds": null,
+              "role": "user",
+              "taskId": "f46a7d57-9114-442f-9fb6-f31fdaa721fd"
+            },
+            {
+              "contextId": null,
+              "extensions": null,
+              "kind": "message",
+              "messageId": "1e952e0d-d5e9-42e2-8e2f-48677e9965a1",
+              "metadata": null,
+              "parts": [
+                {
+                  "data": {
+                    "id": "adk-4e918bab-14ec-4997-9371-86b28405bdfd",
+                    "args": {},
+                    "name": "execute_with_context"
+                  },
+                  "kind": "data",
+                  "metadata": {
+                    "adk_type": "function_call"
+                  }
+                }
+              ],
+              "referenceTaskIds": null,
+              "role": "agent",
+              "taskId": null
+            }
+          ],
+          "id": "f46a7d57-9114-442f-9fb6-f31fdaa721fd",
+          "kind": "task",
+          "metadata": {
+            "adk_app_name": "AuthenticatedAgent",
+            "adk_user_id": "A2A_USER_1e0d7f4e-a952-479f-b254-036e8376a62e",
+            "adk_session_id": "1e0d7f4e-a952-479f-b254-036e8376a62e",
+            "adk_invocation_id": "e-7f7db01d-290b-455b-a024-3e8bbe618b91",
+            "adk_author": "AuthenticatedAgent",
+            "adk_usage_metadata": {
+              "candidatesTokenCount": 5,
+              "candidatesTokensDetails": [
+                {
+                  "modality": "TEXT",
+                  "tokenCount": 5
+                }
+              ],
+              "promptTokenCount": 445,
+              "promptTokensDetails": [
+                {
+                  "modality": "TEXT",
+                  "tokenCount": 445
+                }
+              ],
+              "thoughtsTokenCount": 104,
+              "totalTokenCount": 554,
+              "trafficType": "ON_DEMAND"
+            }
+          },
+          "status": {
+            "message": {
+              "contextId": null,
+              "extensions": null,
+              "kind": "message",
+              "messageId": "3a3f8682-d2db-401c-a68e-796fb486f470",
+              "metadata": null,
+              "parts": [
+                {
+                  "kind": "text",
+                  "metadata": null,
+                  "text": "'State' object has no attribute 'keys'"
+                }
+              ],
+              "referenceTaskIds": null,
+              "role": "agent",
+              "taskId": null
+            },
+            "state": "failed",
+            "timestamp": "2025-09-29T16:57:57.426803+00:00"
+          }
+        }
+      },
+      "success": true
+    },
+    "token_to_remote_agent": {
+      "status_code": 200,
+      "request_headers": {
+        "Authorization": "Bearer test-bearer-token-123456789-for-forwarding-test",
+        "Content-Type": "application/json"
+      },
+      "request_payload": {
+        "jsonrpc": "2.0",
+        "id": "test-2",
+        "method": "message/send",
+        "params": {
+          "message": {
+            "messageId": "test-message-2",
+            "role": "user",
+            "parts": [
+              {
+                "text": "Please use the remote_bearer_token_print_tool to analyze my bearer token"
+              }
+            ]
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": "test-2",
+        "result": {
+          "artifacts": null,
+          "contextId": "49fa2c08-12db-4da9-963d-ba1f008136d9",
+          "history": [
+            {
+              "contextId": "49fa2c08-12db-4da9-963d-ba1f008136d9",
+              "extensions": null,
+              "kind": "message",
+              "messageId": "test-message-2",
+              "metadata": null,
+              "parts": [
+                {
+                  "kind": "text",
+                  "metadata": null,
+                  "text": "Please use the remote_bearer_token_print_tool to analyze my bearer token"
+                }
+              ],
+              "referenceTaskIds": null,
+              "role": "user",
+              "taskId": "6e347c39-a3be-4f38-aede-7a4dc6611a2b"
+            },
+            {
+              "contextId": "49fa2c08-12db-4da9-963d-ba1f008136d9",
+              "extensions": null,
+              "kind": "message",
+              "messageId": "test-message-2",
+              "metadata": null,
+              "parts": [
+                {
+                  "kind": "text",
+                  "metadata": null,
+                  "text": "Please use the remote_bearer_token_print_tool to analyze my bearer token"
+                }
+              ],
+              "referenceTaskIds": null,
+              "role": "user",
+              "taskId": "6e347c39-a3be-4f38-aede-7a4dc6611a2b"
+            },
+            {
+              "contextId": null,
+              "extensions": null,
+              "kind": "message",
+              "messageId": "b45803ae-db82-4422-9a2f-6294e823be9f",
+              "metadata": null,
+              "parts": [
+                {
+                  "data": {
+                    "id": "adk-415161bb-cc30-44e4-b929-c963feede9aa",
+                    "args": {},
+                    "name": "execute_with_context"
+                  },
+                  "kind": "data",
+                  "metadata": {
+                    "adk_type": "function_call"
+                  }
+                }
+              ],
+              "referenceTaskIds": null,
+              "role": "agent",
+              "taskId": null
+            }
+          ],
+          "id": "6e347c39-a3be-4f38-aede-7a4dc6611a2b",
+          "kind": "task",
+          "metadata": {
+            "adk_app_name": "RemoteBearerTokenTestAgent",
+            "adk_user_id": "A2A_USER_49fa2c08-12db-4da9-963d-ba1f008136d9",
+            "adk_session_id": "49fa2c08-12db-4da9-963d-ba1f008136d9",
+            "adk_invocation_id": "e-4fe758be-bc91-43fb-8f11-756102bc3da4",
+            "adk_author": "RemoteBearerTokenTestAgent",
+            "adk_usage_metadata": {
+              "candidatesTokenCount": 5,
+              "candidatesTokensDetails": [
+                {
+                  "modality": "TEXT",
+                  "tokenCount": 5
+                }
+              ],
+              "promptTokenCount": 233,
+              "promptTokensDetails": [
+                {
+                  "modality": "TEXT",
+                  "tokenCount": 233
+                }
+              ],
+              "thoughtsTokenCount": 71,
+              "totalTokenCount": 309,
+              "trafficType": "ON_DEMAND"
+            }
+          },
+          "status": {
+            "message": {
+              "contextId": null,
+              "extensions": null,
+              "kind": "message",
+              "messageId": "d2e9f85e-3fc2-4b42-8365-5993c02275e7",
+              "metadata": null,
+              "parts": [
+                {
+                  "kind": "text",
+                  "metadata": null,
+                  "text": "'State' object has no attribute 'keys'"
+                }
+              ],
+              "referenceTaskIds": null,
+              "role": "agent",
+              "taskId": null
+            },
+            "state": "failed",
+            "timestamp": "2025-09-29T16:57:59.376229+00:00"
+          }
+        }
+      },
+      "success": true
+    },
+    "invalid_token_handling": {
+      "status_code": 401,
+      "response": {
+        "error": "Authentication required",
+        "message": "This endpoint requires authentication",
+        "supported_methods": [
+          "bearer",
+          "oauth_device_flow"
+        ],
+        "details": {
+          "supported_methods": [
+            "bearer",
+            "oauth_device_flow"
+          ],
+          "bearer_token": {
+            "description": "Pass bearer token in Authorization header",
+            "header": "Authorization: Bearer <token>",
+            "formats": [
+              "JWT",
+              "OAuth2 access token"
+            ]
+          },
+          "oauth_device_flow": {
+            "description": "OAuth device flow for interactive authentication",
+            "initiation_required": true,
+            "flow_type": "device_flow"
+          }
+        }
+      },
+      "authentication_required": true,
+      "proper_auth_error": true
+    }
+  },
+  "test_completed": 1759165079.401841,
+  "test_duration": 4.5012171268463135,
+  "summary": {
+    "total_tests": 5,
+    "passed_tests": 3,
+    "failed_tests": 2,
+    "test_details": {
+      "health_checks": true,
+      "dual_auth_status": true,
+      "token_to_tools": false,
+      "token_to_remote_agent": false,
+      "invalid_token_handling": true
+    },
+    "overall_success": false,
+    "success_rate": 0.6
+  }
+}
