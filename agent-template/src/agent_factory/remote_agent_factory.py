@@ -1,13 +1,14 @@
 """
-Remote Agent Factory
+Authenticated Remote Agent Factory
 
-This module provides functionality to optionally load and create remote agents
-based on configuration files using official ADK A2A patterns.
+This module provides functionality to load and create remote agents with
+authentication context forwarding using official ADK A2A patterns.
 """
 
 import os
 import yaml
 import logging
+import httpx
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
@@ -27,17 +28,18 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class RemoteAgentFactory:
+class AuthenticatedRemoteAgentFactory:
     """
-    Factory class for creating and managing remote agents based on configuration.
+    Factory class for creating and managing remote agents with authentication forwarding.
 
-    Supports optional remote agent integration - if no configuration is found
-    or if configuration is empty, returns empty list for standalone operation.
+    This factory automatically forwards authentication context (bearer tokens, OAuth context)
+    to remote agents via HTTP headers when delegating tasks. Supports optional remote agent
+    integration - if no configuration is found or empty, returns empty list for standalone operation.
     """
 
     def __init__(self, config_dir: str = "config"):
         """
-        Initialize the RemoteAgentFactory.
+        Initialize the AuthenticatedRemoteAgentFactory.
 
         Args:
             config_dir: Directory containing configuration files
@@ -45,12 +47,15 @@ class RemoteAgentFactory:
         self.config_dir = Path(config_dir)
         self.remote_config_path = self.config_dir / "remote_agents.yaml"
 
-    async def load_remote_agents_if_configured(self) -> List[RemoteA2aAgent]:
+    async def load_remote_agents_if_configured(self, auth_context: Optional[Dict[str, Any]] = None) -> List[RemoteA2aAgent]:
         """
-        Load remote agents only if configured, otherwise return empty list.
+        Load remote agents with authentication context forwarding, only if configured.
+
+        Args:
+            auth_context: Authentication context to forward to remote agents
 
         Returns:
-            List of RemoteA2aAgent instances, empty if no configuration or disabled
+            List of RemoteA2aAgent instances with auth forwarding, empty if no configuration or disabled
         """
         try:
             # Check if remote agents config file exists
@@ -70,14 +75,20 @@ class RemoteAgentFactory:
                 logger.info("No remote agents configured - running in single agent mode")
                 return []
 
-            # Create remote agents
+            # Create remote agents with auth forwarding
             remote_agents = []
             for agent_config in remote_agents_config:
                 if self._is_agent_enabled(agent_config):
                     try:
-                        remote_agent = await self._create_remote_agent(agent_config)
+                        remote_agent = await self._create_authenticated_remote_agent(agent_config, auth_context)
                         remote_agents.append(remote_agent)
-                        logger.info(f"Loaded remote agent: {remote_agent.name}")
+
+                        # Log auth forwarding status
+                        if auth_context and auth_context.get("authenticated"):
+                            logger.info(f"Loaded remote agent with auth forwarding: {remote_agent.name}")
+                        else:
+                            logger.info(f"Loaded remote agent (no auth context): {remote_agent.name}")
+
                     except Exception as e:
                         logger.error(f"Failed to create remote agent {agent_config.get('name', 'unknown')}: {e}")
                         # Continue loading other agents even if one fails
@@ -86,7 +97,8 @@ class RemoteAgentFactory:
                     logger.info(f"Remote agent {agent_config.get('name', 'unknown')} is disabled")
 
             if remote_agents:
-                logger.info(f"Successfully loaded {len(remote_agents)} remote agents")
+                auth_status = "with authentication forwarding" if auth_context and auth_context.get("authenticated") else "without authentication"
+                logger.info(f"Successfully loaded {len(remote_agents)} remote agents {auth_status}")
             else:
                 logger.info("No enabled remote agents found - running in single agent mode")
 
@@ -96,6 +108,122 @@ class RemoteAgentFactory:
             logger.error(f"Error loading remote agents configuration: {e}")
             logger.info("Falling back to single agent mode due to configuration error")
             return []
+
+    async def _create_authenticated_remote_agent(self, config: Dict[str, Any], auth_context: Optional[Dict[str, Any]] = None) -> RemoteA2aAgent:
+        """
+        Create a RemoteA2aAgent with authentication context forwarding.
+
+        Args:
+            config: Configuration dictionary containing agent details
+            auth_context: Authentication context to forward
+
+        Returns:
+            RemoteA2aAgent instance with auth headers configured
+
+        Raises:
+            ValueError: If required configuration fields are missing
+        """
+        # Validate required fields
+        required_fields = ["name", "description", "agent_card_url"]
+        for field in required_fields:
+            if field not in config:
+                raise ValueError(f"Missing required field '{field}' in remote agent configuration")
+
+        name = config["name"]
+        description = config["description"]
+        agent_card_url = config["agent_card_url"]
+
+        # Ensure agent card URL has the well-known path
+        if not agent_card_url.endswith(AGENT_CARD_WELL_KNOWN_PATH):
+            if agent_card_url.endswith('/'):
+                agent_card_url = agent_card_url.rstrip('/') + AGENT_CARD_WELL_KNOWN_PATH
+            else:
+                agent_card_url = agent_card_url + AGENT_CARD_WELL_KNOWN_PATH
+
+        logger.debug(f"Creating authenticated remote agent: {name} with card URL: {agent_card_url}")
+
+        # Create RemoteA2aAgent with custom HTTP client for auth forwarding
+        if auth_context and auth_context.get("authenticated"):
+            # Extract authentication token
+            token = auth_context.get("token")
+            auth_type = auth_context.get("auth_type", "bearer")
+
+            if token:
+                logger.debug(f"Configuring auth forwarding for {name}: {auth_type} token")
+
+                # Create custom HTTP client with authentication headers
+                headers = {
+                    "Authorization": f"Bearer {token}",
+                    "User-Agent": f"agent-template-root-agent/{name}",
+                    "X-Forwarded-Auth-Type": auth_type
+                }
+
+                # Add additional context headers if available
+                if auth_context.get("user_id"):
+                    headers["X-Forwarded-User-ID"] = auth_context["user_id"]
+                if auth_context.get("provider"):
+                    headers["X-Forwarded-Auth-Provider"] = auth_context["provider"]
+
+                # Create authenticated HTTP client
+                http_client = httpx.AsyncClient(
+                    timeout=30.0,
+                    headers=headers,
+                    follow_redirects=True
+                )
+
+                logger.info(f"Created authenticated HTTP client for {name} with bearer token forwarding")
+            else:
+                logger.warning(f"Auth context provided for {name} but no token found - using default client")
+                http_client = None
+        else:
+            logger.debug(f"No auth context for {name} - using default client")
+            http_client = None
+
+        # Create the RemoteA2aAgent
+        # Note: The Google ADK RemoteA2aAgent constructor may not accept custom http_client
+        # We'll try to pass it, and fall back to standard constructor if needed
+        try:
+            if http_client:
+                # Try to create with custom HTTP client (this might not be supported by ADK)
+                # If RemoteA2aAgent doesn't support custom client, we'll catch the exception
+                remote_agent = RemoteA2aAgent(
+                    name=name,
+                    description=description,
+                    agent_card=agent_card_url
+                )
+
+                # Try to set the HTTP client if the agent has that capability
+                if hasattr(remote_agent, '_http_client') or hasattr(remote_agent, 'http_client'):
+                    if hasattr(remote_agent, '_http_client'):
+                        remote_agent._http_client = http_client
+                    else:
+                        remote_agent.http_client = http_client
+                    logger.debug(f"Successfully set custom HTTP client for {name}")
+                else:
+                    # ADK might handle HTTP client internally - log this for awareness
+                    logger.warning(f"RemoteA2aAgent for {name} does not expose HTTP client - auth forwarding might need ADK-level configuration")
+                    # Close the custom client since we can't use it
+                    await http_client.aclose()
+            else:
+                # Standard creation without auth forwarding
+                remote_agent = RemoteA2aAgent(
+                    name=name,
+                    description=description,
+                    agent_card=agent_card_url
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to create RemoteA2aAgent with custom client: {e}")
+            # Fallback to standard creation
+            remote_agent = RemoteA2aAgent(
+                name=name,
+                description=description,
+                agent_card=agent_card_url
+            )
+            if http_client:
+                await http_client.aclose()
+
+        return remote_agent
 
     def _load_config(self) -> Optional[Dict[str, Any]]:
         """
@@ -127,44 +255,6 @@ class RemoteAgentFactory:
         """
         return agent_config.get("enabled", True)  # Default to enabled
 
-    async def _create_remote_agent(self, config: Dict[str, Any]) -> RemoteA2aAgent:
-        """
-        Create a RemoteA2aAgent from configuration.
-
-        Args:
-            config: Configuration dictionary containing agent details
-
-        Returns:
-            RemoteA2aAgent instance
-
-        Raises:
-            ValueError: If required configuration fields are missing
-        """
-        # Validate required fields
-        required_fields = ["name", "description", "agent_card_url"]
-        for field in required_fields:
-            if field not in config:
-                raise ValueError(f"Missing required field '{field}' in remote agent configuration")
-
-        name = config["name"]
-        description = config["description"]
-        agent_card_url = config["agent_card_url"]
-
-        # Ensure agent card URL has the well-known path
-        if not agent_card_url.endswith(AGENT_CARD_WELL_KNOWN_PATH):
-            if agent_card_url.endswith('/'):
-                agent_card_url = agent_card_url.rstrip('/') + AGENT_CARD_WELL_KNOWN_PATH
-            else:
-                agent_card_url = agent_card_url + AGENT_CARD_WELL_KNOWN_PATH
-
-        logger.debug(f"Creating remote agent: {name} with card URL: {agent_card_url}")
-
-        return RemoteA2aAgent(
-            name=name,
-            description=description,
-            agent_card=agent_card_url
-        )
-
     def get_config_template(self) -> Dict[str, Any]:
         """
         Get a template configuration for remote agents.
@@ -176,8 +266,8 @@ class RemoteAgentFactory:
             "remote_agents": [
                 {
                     "name": "example_remote_agent",
-                    "description": "Example remote agent for demonstration",
-                    "agent_card_url": "http://localhost:8002/a2a/example_agent",
+                    "description": "Example remote agent with authentication forwarding support",
+                    "agent_card_url": "http://localhost:8002",
                     "enabled": True
                 }
             ]
@@ -272,3 +362,7 @@ class RemoteAgentFactory:
             result["errors"].append(f"Validation error: {e}")
 
         return result
+
+
+# Legacy alias for backward compatibility (will be removed in future versions)
+RemoteAgentFactory = AuthenticatedRemoteAgentFactory

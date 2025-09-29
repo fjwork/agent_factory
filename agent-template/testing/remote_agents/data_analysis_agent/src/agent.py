@@ -18,8 +18,7 @@ from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 
-from .data_analysis_tool import DataAnalysisTool
-
+from data_analysis_tool import DataAnalysisTool
 # Configure logging
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -27,6 +26,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+from dotenv import load_dotenv
+load_dotenv()
 
 def create_data_analysis_agent() -> Agent:
     """Create the data analysis remote agent."""

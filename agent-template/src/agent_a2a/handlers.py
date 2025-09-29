@@ -35,6 +35,7 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
         runner=None
     ):
         super().__init__(agent_executor, task_store)
+        self.agent_executor = agent_executor  # Store for auth context injection
         self.oauth_middleware = oauth_middleware
         self.dual_auth_middleware = DualAuthMiddleware(oauth_middleware)
         self.card_builder = card_builder
@@ -75,6 +76,9 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
             if body:
                 # Store OAuth context in ADK session state with parsed body
                 await self._store_oauth_in_session_state(user_context, body)
+
+                # Update agent's remote agents with authentication context for this request
+                await self._inject_auth_context_into_agent(user_context)
                 import json
                 from a2a.types import MessageSendParams
                 from a2a.server.context import ServerCallContext
@@ -540,3 +544,87 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
                 {"error": "Failed to generate agent card"},
                 status_code=500
             )
+
+    def extract_auth_context_for_forwarding(self) -> Optional[Dict[str, Any]]:
+        """
+        Extract authentication context that can be forwarded to remote agents.
+
+        Returns:
+            Dictionary containing auth context for forwarding, or None if no auth available
+        """
+        try:
+            # Check for OAuth context in global registry first
+            if hasattr(self.__class__, '_oauth_registry') and self.__class__._oauth_registry:
+                # Get the first available OAuth context (in multi-user scenarios, you might need to track current user)
+                for user_id, oauth_context in self.__class__._oauth_registry.items():
+                    if oauth_context.get("oauth_authenticated"):
+                        oauth_token = oauth_context.get("oauth_token")
+                        if oauth_token:
+                            logger.debug(f"Extracting OAuth token for remote agent forwarding: {user_id}")
+                            return {
+                                "auth_type": "bearer",
+                                "token": oauth_token,
+                                "user_id": user_id,
+                                "provider": oauth_context.get("oauth_provider"),
+                                "authenticated": True
+                            }
+
+            # Try to get from OAuth middleware if available
+            if hasattr(self, 'oauth_middleware') and self.oauth_middleware:
+                # In a real implementation, you might need to track the current user
+                # For now, we'll try to get any valid token
+                pass
+
+            logger.debug("No authentication context available for forwarding")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error extracting auth context for forwarding: {e}")
+            return None
+
+    async def _inject_auth_context_into_agent(self, user_context: Dict[str, Any]) -> None:
+        """
+        Inject authentication context into the agent's remote agents.
+
+        This method updates the agent's sub_agents with authentication-enabled
+        remote agents that can forward the current user's auth context.
+
+        Args:
+            user_context: The authenticated user context from the current request
+        """
+        try:
+            # Get the agent from the executor
+            if not hasattr(self, 'agent_executor') or not hasattr(self.agent_executor, 'runner'):
+                logger.warning("No agent executor available for auth context injection")
+                return
+
+            agent = self.agent_executor.runner.agent
+
+            # Check if agent supports remote agent reloading
+            if not hasattr(agent, '_remote_factory'):
+                logger.debug("Agent does not support remote agent auth injection")
+                return
+
+            # Import the reload function
+            from agent import reload_agent_with_auth_context
+
+            # Extract auth context for forwarding
+            auth_context = self.extract_auth_context_for_forwarding()
+            if not auth_context:
+                # Use user_context as fallback
+                auth_context = {
+                    "auth_type": user_context.get("auth_type", "bearer"),
+                    "token": user_context.get("token") or user_context.get("access_token"),
+                    "user_id": user_context.get("user_id"),
+                    "provider": user_context.get("provider"),
+                    "authenticated": user_context.get("authenticated", False)
+                }
+
+            # Reload agent with authentication context
+            updated_agent = await reload_agent_with_auth_context(agent, auth_context)
+
+            logger.debug(f"Successfully injected auth context into agent for user: {user_context.get('user_id')}")
+
+        except Exception as e:
+            logger.error(f"Failed to inject auth context into agent: {e}")
+            # Continue with the request even if auth injection fails

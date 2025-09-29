@@ -15,13 +15,13 @@ remote_agents:
   # Data Analysis Agent - Handles complex data processing and visualization
   - name: "data_analysis_agent"
     description: "Handles complex data analysis, statistical computations, data visualization, and reporting tasks"
-    agent_card_url: "http://localhost:8002/a2a/data_analysis_agent"
+    agent_card_url: "http://localhost:8002"
     enabled: true
 
   # Notification Agent - Manages communications and alerts
   - name: "notification_agent"
     description: "Sends notifications, alerts, emails, SMS, and handles all communication tasks"
-    agent_card_url: "http://localhost:8003/a2a/notification_agent"
+    agent_card_url: "http://localhost:8003"
     enabled: true
 
   # Approval Agent - Handles workflow approvals and human-in-the-loop processes

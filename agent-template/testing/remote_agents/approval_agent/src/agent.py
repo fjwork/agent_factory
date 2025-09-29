@@ -18,7 +18,7 @@ from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 
-from .approval_tool import ApprovalTool
+from approval_tool import ApprovalTool
 
 # Configure logging
 logging.basicConfig(

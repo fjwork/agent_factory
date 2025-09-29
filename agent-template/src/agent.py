@@ -26,7 +26,7 @@ from auth.auth_config import load_auth_config
 from agent_a2a.server import create_authenticated_a2a_server
 from tools.authenticated_tool import AuthenticatedTool
 from tools.example_tool import ExampleTool, BearerTokenPrintTool
-from agent_factory.remote_agent_factory import RemoteAgentFactory
+from agent_factory.remote_agent_factory import AuthenticatedRemoteAgentFactory
 
 # Configure logging
 logging.basicConfig(
@@ -61,9 +61,12 @@ async def create_agent() -> Agent:
 
     tools = [example_function_tool, bearer_token_print_function_tool]
 
-    # Load remote agents if configured (optional)
+    # Load remote agents if configured (optional) with authentication forwarding
     config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
-    remote_factory = RemoteAgentFactory(config_dir)
+    remote_factory = AuthenticatedRemoteAgentFactory(config_dir)
+
+    # Load remote agents without auth context initially
+    # Authentication context will be added dynamically per request
     remote_agents = await remote_factory.load_remote_agents_if_configured()
 
     # Build dynamic instruction based on available remote agents
@@ -79,6 +82,10 @@ async def create_agent() -> Agent:
         description=f"{agent_name} with OAuth authentication and A2A protocol support"
     )
 
+    # Store the remote factory on the agent for runtime auth context injection
+    agent._remote_factory = remote_factory
+    agent._config_dir = config_dir
+
     # Log agent creation details
     if remote_agents:
         logger.info(f"✅ Created agent with {len(remote_agents)} remote sub-agents:")
@@ -88,6 +95,49 @@ async def create_agent() -> Agent:
         logger.info("✅ Created agent in standalone mode (no remote agents)")
 
     return agent
+
+
+async def reload_agent_with_auth_context(agent: Agent, auth_context: Optional[Dict[str, Any]] = None) -> Agent:
+    """
+    Reload an agent's remote agents with authentication context.
+
+    This function is called when we have authentication context available
+    and need to update the agent's sub-agents with auth forwarding.
+
+    Args:
+        agent: The existing agent instance
+        auth_context: Authentication context to forward to remote agents
+
+    Returns:
+        Updated agent with authentication-enabled remote agents
+    """
+    if not hasattr(agent, '_remote_factory') or not hasattr(agent, '_config_dir'):
+        logger.debug("Agent does not have remote factory - no auth context injection needed")
+        return agent
+
+    try:
+        # Load remote agents with authentication context
+        remote_factory = agent._remote_factory
+        remote_agents_with_auth = await remote_factory.load_remote_agents_if_configured(auth_context)
+
+        # Update the agent's sub_agents if we have remote agents
+        if remote_agents_with_auth:
+            agent.sub_agents = remote_agents_with_auth
+
+            if auth_context and auth_context.get("authenticated"):
+                logger.info(f"🔐 Updated {len(remote_agents_with_auth)} remote agents with authentication context")
+            else:
+                logger.debug(f"📱 Loaded {len(remote_agents_with_auth)} remote agents without authentication context")
+        else:
+            agent.sub_agents = None
+            logger.debug("No remote agents configured - agent remains in standalone mode")
+
+        return agent
+
+    except Exception as e:
+        logger.error(f"Failed to reload agent with auth context: {e}")
+        # Return original agent if reload fails
+        return agent
 
 
 def _build_agent_instruction(agent_name: str, remote_agents: List) -> str:
