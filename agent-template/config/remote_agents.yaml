@@ -12,7 +12,7 @@
 # to remote agents when tasks are delegated.
 
 remote_agents:
-  # Auth Validation Agent - Template-based agent for testing authentication forwarding
+  # Auth Validation Agent - Template-based agent for testing authentication forwarding. This is for testing the remote-agent-sample running on another port
   - name: "auth_validation_agent"
     description: "Validates authentication context forwarding via A2A protocol using the full template infrastructure"
     agent_card_url: "http://localhost:8002"

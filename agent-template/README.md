@@ -81,60 +81,85 @@ This template provides a complete foundation for creating OAuth-authenticated AI
 └───────────────────────────────────────────────────────────────┘
 ```
 
-## 📁 Project Structure
+## 📁 Template Structure
 
 ```
 agent-template/
-├── src/
-│   ├── agent.py                          # Main entry point - create_agent() with optional remote agents
-│   ├── agent_factory/                    # Remote agent management
-│   │   ├── __init__.py                   # Module initialization
-│   │   └── remote_agent_factory.py      # RemoteAgentFactory for optional loading
-│   ├── auth/                             # OAuth authentication system
-│   │   ├── oauth_middleware.py           # OAuthMiddleware class
-│   │   ├── credential_store.py           # Token storage (Memory/File/SecretManager)
-│   │   └── auth_config.py               # Configuration management
-│   ├── agent_a2a/                       # A2A protocol implementation
-│   │   ├── server.py                    # AuthenticatedA2AServer class
-│   │   ├── handlers.py                  # AuthenticatedRequestHandler class
-│   │   └── agent_card.py               # AgentCardBuilder class
-│   └── tools/                           # Agent tools
-│       ├── authenticated_tool.py        # AuthenticatedTool base class
-│       ├── example_tool.py             # ExampleTool implementation
-│       └── examples/                   # Additional example tools
-├── config/
-│   ├── agent_config.yaml              # Agent settings and capabilities
-│   ├── oauth_config.yaml              # OAuth provider configuration
-│   └── remote_agents.yaml             # Optional remote agents configuration
-├── testing/                            # Complete testing framework
-│   ├── README.md                       # Testing documentation
-│   ├── test_root_agent.py             # Root agent tests (standalone + multi-agent)
-│   ├── test_auth_forwarding.py        # End-to-end authentication forwarding tests
-│   ├── test_remote_agents/            # Individual remote agent tests
-│   │   ├── test_data_analysis_agent.py
-│   │   ├── test_notification_agent.py
-│   │   └── test_approval_agent.py
-│   ├── remote_agents/                 # Sample remote agents for testing
-│   │   ├── data_analysis_agent/       # Data analysis and reporting
-│   │   ├── notification_agent/        # Multi-channel notifications
-│   │   └── approval_agent/            # Workflow approvals
-│   └── utils/                         # Testing utilities
-│       ├── test_client.py             # AuthenticatedTestClient
-│       └── auth_test_utils.py         # Authentication testing helpers
-├── examples/                          # Documentation and setup guides
-│   ├── standalone_setup.md            # Single agent setup guide
-│   ├── multi_agent_setup.md           # Multi-agent setup guide
-│   ├── troubleshooting.md             # Comprehensive troubleshooting guide
-│   └── configurations/                # Configuration examples
-│       ├── minimal_remote_agents.yaml
-│       ├── complete_remote_agents.yaml
-│       ├── development_remote_agents.yaml
-│       ├── production_remote_agents.yaml
-│       └── environment_examples.md
-├── IMPLEMENTATION_STRATEGY.md         # Complete implementation progress tracking
-├── oauth_test_client.py              # OAuth test client
-└── README.md                         # This file
+├── src/                               # Core agent implementation
+│   ├── agent.py                       # Main entry point - create_agent() function
+│   ├── agent_factory/                 # Remote agent management
+│   │   ├── __init__.py
+│   │   └── remote_agent_factory.py   # RemoteAgentFactory for multi-agent orchestration
+│   ├── auth/                          # OAuth authentication system
+│   │   ├── oauth_middleware.py        # OAuth middleware for authentication flows
+│   │   ├── dual_auth_middleware.py    # Dual authentication (Bearer + OAuth)
+│   │   ├── credential_store.py        # Token storage (Memory/File/SecretManager)
+│   │   ├── auth_config.py            # Authentication configuration
+│   │   └── agent_auth_callback.py    # Authentication context injection
+│   ├── agent_a2a/                    # Agent-to-Agent protocol implementation
+│   │   ├── server.py                 # AuthenticatedA2AServer class
+│   │   ├── handlers.py               # AuthenticatedRequestHandler class
+│   │   └── agent_card.py            # AgentCardBuilder class
+│   └── tools/                        # Agent tools and capabilities
+│       ├── authenticated_tool.py     # AuthenticatedTool base class
+│       ├── example_tool.py          # Example tool with OAuth API integration
+│       ├── auth_validation_tool.py  # Authentication context validation tool
+│       └── examples/                # Additional example tools and patterns
+├── config/                           # Configuration files
+│   ├── agent_config.yaml           # Agent settings and capabilities
+│   ├── oauth_config.yaml           # OAuth provider configuration
+│   └── remote_agents.yaml          # Remote agents configuration (optional)
+├── deployment/                      # Deployment configurations
+│   ├── agent_engine/               # Google Agent Engine deployment
+│   ├── cloud_run/                  # Cloud Run deployment
+│   ├── docker/                     # Docker configurations
+│   └── scripts/                    # Deployment automation scripts
+├── docs/                           # Documentation
+│   └── setup.md                   # Complete setup guide
+├── testing_scripts/               # Testing and validation scripts
+│   └── [various test scripts]     # Authentication, A2A, and integration tests
+├── .env.example                   # Environment variables template
+├── requirements.txt               # Python dependencies
+└── README.md                      # This documentation
 ```
+
+## 🗂️ Folder Descriptions
+
+### `src/` - Core Implementation
+**Purpose**: Contains all the agent's source code and business logic
+
+- **`agent.py`**: Main entry point that creates and configures the agent
+- **`agent_factory/`**: Manages remote agent connections and orchestration
+- **`auth/`**: Complete OAuth authentication system with token management
+- **`agent_a2a/`**: Agent-to-Agent protocol implementation for multi-agent communication
+- **`tools/`**: Agent capabilities - tools the agent can execute
+
+### `config/` - Configuration
+**Purpose**: YAML configuration files for different aspects of the agent
+
+- **`agent_config.yaml`**: Agent metadata, capabilities, and behavior settings
+- **`oauth_config.yaml`**: OAuth provider settings (Google, Azure, etc.)
+- **`remote_agents.yaml`**: Optional configuration for remote agent orchestration
+
+### `deployment/` - Deployment Options
+**Purpose**: Ready-to-use deployment configurations for different platforms
+
+- **`agent_engine/`**: Google Agent Engine deployment files
+- **`cloud_run/`**: Google Cloud Run deployment configuration
+- **`docker/`**: Docker containerization files
+- **`scripts/`**: Automated deployment and setup scripts
+
+### `docs/` - Documentation
+**Purpose**: Setup guides and documentation
+
+- **`setup.md`**: Comprehensive setup instructions for the template
+
+### `testing_scripts/` - Testing & Validation
+**Purpose**: Scripts to test authentication, A2A communication, and agent functionality
+
+- Contains various test scripts for validating authentication forwarding
+- A2A protocol testing
+- Integration testing with remote agents
 
 ## 🚀 Quick Start
 
