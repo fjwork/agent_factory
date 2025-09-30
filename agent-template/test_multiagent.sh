@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test multi-agent communication with bearer token
+# Test authentication forwarding to remote agent with bearer token
 curl -X POST http://localhost:8001/ \
   -H "Authorization: Bearer test-token-123" \
   -H "Content-Type: application/json" \
@@ -10,10 +10,10 @@ curl -X POST http://localhost:8001/ \
     "method": "message/send",
     "params": {
       "message": {
-        "messageId": "multi-agent-test",
+        "messageId": "auth-validation-test",
         "role": "user",
         "parts": [{
-          "text": "Please delegate this task: analyze my sales data using the data_analysis_agent, return the result"
+          "text": "Please delegate this task to the auth_validation_agent: validate my authentication context"
         }]
       }
     }

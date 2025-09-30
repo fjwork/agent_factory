@@ -12,23 +12,22 @@
 # to remote agents when tasks are delegated.
 
 remote_agents:
-  # Data Analysis Agent - Handles complex data processing and visualization
-  - name: "data_analysis_agent"
-    description: "Handles complex data analysis, statistical computations, data visualization, and reporting tasks"
+  # Auth Validation Agent - Template-based agent for testing authentication forwarding
+  - name: "auth_validation_agent"
+    description: "Validates authentication context forwarding via A2A protocol using the full template infrastructure"
     agent_card_url: "http://localhost:8002"
     enabled: true
 
-  # Notification Agent - Manages communications and alerts
-  - name: "notification_agent"
-    description: "Sends notifications, alerts, emails, SMS, and handles all communication tasks"
-    agent_card_url: "http://localhost:8003"
-    enabled: true
+  # Disabled agents for testing - uncomment to enable
+  # - name: "data_analysis_agent"
+  #   description: "Handles complex data analysis, statistical computations, data visualization, and reporting tasks"
+  #   agent_card_url: "http://localhost:8003"
+  #   enabled: false
 
-  # Approval Agent - Handles workflow approvals and human-in-the-loop processes
-  - name: "approval_agent"
-    description: "Handles approval workflows, human-in-the-loop processes, and escalation management"
-    agent_card_url: "http://localhost:8004/a2a/approval_agent"
-    enabled: false  # Disabled by default for testing
+  # - name: "notification_agent"
+  #   description: "Sends notifications, alerts, emails, SMS, and handles all communication tasks"
+  #   agent_card_url: "http://localhost:8004"
+  #   enabled: false
 
 # Configuration Notes:
 # - Set enabled: false to disable a specific agent without removing its configuration
