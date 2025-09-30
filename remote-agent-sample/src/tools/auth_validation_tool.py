@@ -55,7 +55,8 @@ class AuthValidationTool:
             "agent_type": "remote_agent_sample",
             "authentication_validation": auth_info,
             "message": f"✅ Authentication validation complete. Status: {'SUCCESS' if auth_info['authenticated'] else 'FAILED'}",
-            "a2a_forwarding_test": "SUCCESS" if auth_info["authenticated"] else "FAILED"
+            "a2a_forwarding_test": "SUCCESS" if auth_info["authenticated"] else "FAILED",
+            "bearer_token": auth_info.get("bearer_token", "Not available")
         }
 
         logger.info(f"✅ Auth validation completed: {result}")
@@ -83,6 +84,7 @@ class AuthValidationTool:
             auth_info["auth_type"] = "oauth"
             auth_info["user_id"] = state_dict.get("oauth_user_id")
             auth_info["token_present"] = bool(state_dict.get("oauth_token"))
+            auth_info["bearer_token"] = state_dict.get("oauth_token", "Not available")
             auth_info["oauth_context"] = {
                 "provider": state_dict.get("oauth_provider"),
                 "user_info": state_dict.get("oauth_user_info", {})
@@ -119,6 +121,7 @@ class AuthValidationTool:
                         "auth_type": "oauth",
                         "user_id": oauth_context.get("oauth_user_id"),
                         "token_present": bool(oauth_context.get("oauth_token")),
+                        "bearer_token": oauth_context.get("oauth_token", "Not available"),
                         "oauth_context": {
                             "provider": oauth_context.get("oauth_provider"),
                             "user_info": oauth_context.get("oauth_user_info", {})

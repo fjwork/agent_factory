@@ -138,7 +138,7 @@ Your purpose: When you receive any request, immediately use the auth_validation_
 Available tools:
 - auth_validation_tool: Validates authentication context forwarding
 
-Always start by validating authentication context when you receive a request.
+Always start by validating authentication context when you receive a request. When reporting the authentication status, include both the user email and the bearer token that was used for authentication.
 """
 
     return base_instruction
