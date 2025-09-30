@@ -142,7 +142,8 @@ class AuthenticatedRemoteAgentFactory:
 
         logger.debug(f"Creating authenticated remote agent: {name} with card URL: {agent_card_url}")
 
-        # Create RemoteA2aAgent with custom HTTP client for auth forwarding
+        # Always create HTTP client (with or without auth headers)
+        # This ensures _httpx_client attribute always exists for runtime updates
         if auth_context and auth_context.get("authenticated"):
             # Extract authentication token
             token = auth_context.get("token")
@@ -173,55 +174,56 @@ class AuthenticatedRemoteAgentFactory:
 
                 logger.info(f"Created authenticated HTTP client for {name} with bearer token forwarding")
             else:
-                logger.warning(f"Auth context provided for {name} but no token found - using default client")
-                http_client = None
+                logger.warning(f"Auth context provided for {name} but no token found - creating default client")
+                # Create default client (so _httpx_client attribute exists)
+                http_client = httpx.AsyncClient(
+                    timeout=30.0,
+                    headers={"User-Agent": f"agent-template-root-agent/{name}"},
+                    follow_redirects=True
+                )
         else:
-            logger.debug(f"No auth context for {name} - using default client")
-            http_client = None
+            logger.debug(f"No auth context for {name} - creating default client")
+            # Always create a client so _httpx_client attribute exists for runtime updates
+            http_client = httpx.AsyncClient(
+                timeout=30.0,
+                headers={"User-Agent": f"agent-template-root-agent/{name}"},
+                follow_redirects=True
+            )
 
-        # Create the RemoteA2aAgent
-        # Note: The Google ADK RemoteA2aAgent constructor may not accept custom http_client
-        # We'll try to pass it, and fall back to standard constructor if needed
+        # Create the RemoteA2aAgent with httpx_client parameter (ADK supports this!)
         try:
-            if http_client:
-                # Try to create with custom HTTP client (this might not be supported by ADK)
-                # If RemoteA2aAgent doesn't support custom client, we'll catch the exception
-                remote_agent = RemoteA2aAgent(
-                    name=name,
-                    description=description,
-                    agent_card=agent_card_url
-                )
-
-                # Try to set the HTTP client if the agent has that capability
-                if hasattr(remote_agent, '_http_client') or hasattr(remote_agent, 'http_client'):
-                    if hasattr(remote_agent, '_http_client'):
-                        remote_agent._http_client = http_client
-                    else:
-                        remote_agent.http_client = http_client
-                    logger.debug(f"Successfully set custom HTTP client for {name}")
-                else:
-                    # ADK might handle HTTP client internally - log this for awareness
-                    logger.warning(f"RemoteA2aAgent for {name} does not expose HTTP client - auth forwarding might need ADK-level configuration")
-                    # Close the custom client since we can't use it
-                    await http_client.aclose()
-            else:
-                # Standard creation without auth forwarding
-                remote_agent = RemoteA2aAgent(
-                    name=name,
-                    description=description,
-                    agent_card=agent_card_url
-                )
-
-        except Exception as e:
-            logger.error(f"Failed to create RemoteA2aAgent with custom client: {e}")
-            # Fallback to standard creation
             remote_agent = RemoteA2aAgent(
                 name=name,
                 description=description,
-                agent_card=agent_card_url
+                agent_card=agent_card_url,
+                httpx_client=http_client  # THIS IS THE FIX!
             )
-            if http_client:
-                await http_client.aclose()
+
+            # Always have http_client now, log the auth status
+            if auth_context and auth_context.get("authenticated") and auth_context.get("token"):
+                logger.info(f"✅ Created {name} with authenticated HTTP client")
+            else:
+                logger.info(f"📱 Created {name} with default HTTP client (ready for runtime auth)")
+
+        except Exception as e:
+            logger.error(f"Failed to create RemoteA2aAgent: {e}")
+            # Fallback: try without httpx_client but still create a default client
+            try:
+                remote_agent = RemoteA2aAgent(
+                    name=name,
+                    description=description,
+                    agent_card=agent_card_url
+                )
+                logger.warning(f"Created {name} without httpx_client parameter (ADK version may not support it)")
+                # Clean up the prepared client since we couldn't use it
+                if http_client:
+                    await http_client.aclose()
+            except Exception as fallback_e:
+                logger.error(f"Fallback creation also failed for {name}: {fallback_e}")
+                # Clean up client and re-raise
+                if http_client:
+                    await http_client.aclose()
+                raise
 
         return remote_agent
 

@@ -72,14 +72,18 @@ async def create_agent() -> Agent:
     # Build dynamic instruction based on available remote agents
     instruction = _build_agent_instruction(agent_name, remote_agents)
 
-    # Create agent with optional sub-agents
+    # Import the callback
+    from auth.agent_auth_callback import auth_context_callback
+
+    # Create agent with optional sub-agents and auth callback
     agent = Agent(
         model=model_name,
         name=agent_name,
         instruction=instruction,
         tools=tools,
         sub_agents=remote_agents if remote_agents else None,  # Only add if configured
-        description=f"{agent_name} with OAuth authentication and A2A protocol support"
+        description=f"{agent_name} with OAuth authentication and A2A protocol support",
+        before_agent_callback=auth_context_callback  # ADD THIS LINE
     )
 
     # Store the remote factory on the agent for runtime auth context injection
