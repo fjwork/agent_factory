@@ -242,6 +242,9 @@ class ToolRegistry:
             elif name == "bearer_token_print_tool":
                 from .example_tool import BearerTokenPrintTool
                 return BearerTokenPrintTool()
+            elif name == "profile_tool":
+                from .profile_tool import ProfileTool
+                return ProfileTool()
             else:
                 logger.warning(f"Unknown authenticated tool: {name}")
                 return None

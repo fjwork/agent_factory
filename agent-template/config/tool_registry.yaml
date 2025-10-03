@@ -34,13 +34,14 @@ tools:
         enabled: false  # Disable in production for security
 
   # Custom authenticated tools (add your own here)
-  user_profile_tool:
+  profile_tool:
     type: "authenticated"
-    description: "User profile management tool"
-    enabled: false  # Disabled by default, enable as needed
+    description: "User profile information retrieval tool"
+    enabled: true  # Enable the profile tool
     auth_required: true
     config:
-      profile_fields: ["name", "email", "picture"]
+      default_request_type: "full_profile"
+      available_fields: ["name", "email", "picture", "verified_email", "locale"]
     dependencies: []
 
   api_client_tool:

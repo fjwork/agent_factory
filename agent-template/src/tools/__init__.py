@@ -10,6 +10,7 @@ This module provides:
 
 from .authenticated_tool import AuthenticatedTool, AuthenticationError, ToolExecutionError
 from .example_tool import ExampleTool, BearerTokenPrintTool
+from .profile_tool import ProfileTool
 from .tool_registry import (
     ToolRegistry,
     ToolConfig,
@@ -46,6 +47,7 @@ __all__ = [
     # Example tools
     "ExampleTool",
     "BearerTokenPrintTool",
+    "ProfileTool",
 
     # Tool registry
     "ToolRegistry",
