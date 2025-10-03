@@ -1,0 +1,69 @@
+# Simplified Agent Configuration
+
+agent:
+  name: "${AGENT_NAME:SimplifiedAgent}"
+  description: "Simplified ADK agent with auth forwarding and HTTPS support"
+  version: "1.0.0"
+
+  model:
+    name: "${MODEL_NAME:gemini-2.0-flash}"
+
+  # Agent capabilities
+  capabilities:
+    - "auth_forwarding"
+    - "https_communication"
+    - "bearer_token_support"
+    - "api_key_support"
+
+# Tool configuration
+tools:
+  # Example authenticated tools
+  example_authenticated_tool:
+    enabled: true
+    description: "Demonstrates auth context usage"
+
+  bearer_token_validation_tool:
+    enabled: true
+    description: "Validates bearer token information"
+
+# Server configuration
+server:
+  host: "${HOST:0.0.0.0}"
+  port: "${PORT:8000}"
+
+  # HTTPS configuration
+  https:
+    enabled: "${HTTPS_ENABLED:false}"
+    cert_file: "${SSL_CERT_FILE:}"
+    key_file: "${SSL_KEY_FILE:}"
+
+  # CORS configuration
+  cors:
+    enabled: "${CORS_ENABLED:true}"
+    allow_origins: "${CORS_ORIGINS:*}"
+
+# Logging configuration
+logging:
+  level: "${LOG_LEVEL:INFO}"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Environment-specific overrides
+environments:
+  development:
+    server:
+      https:
+        enabled: false
+      cors:
+        enabled: true
+        allow_origins: "*"
+    logging:
+      level: "DEBUG"
+
+  production:
+    server:
+      https:
+        enabled: true
+      cors:
+        enabled: false
+    logging:
+      level: "INFO"

@@ -1,0 +1,65 @@
+# Simplified Authentication Configuration
+# Minimal configuration for auth forwarding without complex OAuth flows
+
+auth:
+  # Default authentication type for incoming requests
+  default_type: "bearer_token"
+
+  # Require HTTPS in production
+  require_https: true
+
+  # Forward authentication headers to remote agents and tools
+  forward_headers: true
+
+  # Validate tokens (simplified - no complex validation)
+  validate_tokens: false
+
+  # Allowed authentication types
+  allowed_types:
+    - "bearer_token"
+    - "api_key"
+    - "basic_auth"
+
+  # Custom headers to add to forwarded requests
+  custom_headers:
+    X-Agent-Version: "simplified-1.0"
+    X-Forwarded-By: "simplified-template"
+
+# Environment-specific overrides
+environments:
+  development:
+    auth:
+      require_https: false
+      validate_tokens: false
+
+  production:
+    auth:
+      require_https: true
+      validate_tokens: false  # Keep simple for now
+      custom_headers:
+        X-Environment: "production"
+        X-Security-Level: "standard"
+
+# A2A Security configuration (for agent cards)
+a2a_auth:
+  security_schemes:
+    bearerAuth:
+      type: "http"
+      scheme: "bearer"
+      description: "Bearer token authentication for API access"
+
+    apiKeyAuth:
+      type: "apiKey"
+      in: "header"
+      name: "X-API-Key"
+      description: "API key authentication"
+
+    basicAuth:
+      type: "http"
+      scheme: "basic"
+      description: "HTTP Basic authentication"
+
+  # Default security requirements
+  security:
+    - bearerAuth: []
+    - apiKeyAuth: []
