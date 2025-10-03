@@ -1,0 +1,85 @@
+# Tool Registry Configuration
+# This file defines which tools are available to the agent
+
+tools:
+  # OAuth-authenticated tools
+  example_tool:
+    type: "authenticated"
+    description: "Example OAuth-authenticated tool for demonstration"
+    enabled: true
+    auth_required: true
+    config:
+      # Tool-specific configuration
+      default_action: "get_user_info"
+    dependencies: []
+    environments:
+      development:
+        enabled: true
+      production:
+        enabled: true
+
+  bearer_token_print_tool:
+    type: "authenticated"
+    description: "Bearer token testing and validation tool"
+    enabled: true
+    auth_required: true
+    config:
+      debug_mode: true
+    environments:
+      development:
+        enabled: true
+      staging:
+        enabled: true
+      production:
+        enabled: false  # Disable in production for security
+
+  # Custom authenticated tools (add your own here)
+  user_profile_tool:
+    type: "authenticated"
+    description: "User profile management tool"
+    enabled: false  # Disabled by default, enable as needed
+    auth_required: true
+    config:
+      profile_fields: ["name", "email", "picture"]
+    dependencies: []
+
+  api_client_tool:
+    type: "authenticated"
+    description: "Generic authenticated API client"
+    enabled: false  # Disabled by default
+    auth_required: true
+    config:
+      base_url: "${API_BASE_URL}"
+      timeout: 30
+    dependencies: []
+
+# Environment-specific global settings
+environments:
+  development:
+    global_settings:
+      debug_tools: true
+      verbose_logging: true
+
+  staging:
+    global_settings:
+      debug_tools: true
+      verbose_logging: false
+
+  production:
+    global_settings:
+      debug_tools: false
+      verbose_logging: false
+
+# Tool categories for organization
+categories:
+  authentication:
+    description: "Tools for authentication and user management"
+    tools: ["example_tool", "bearer_token_print_tool", "user_profile_tool"]
+
+  external_apis:
+    description: "Tools for external API integration"
+    tools: ["api_client_tool"]
+
+  testing:
+    description: "Tools for testing and validation"
+    tools: ["bearer_token_print_tool"]

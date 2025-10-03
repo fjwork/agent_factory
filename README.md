@@ -1,6 +1,6 @@
 # Agent Factory
 
-A comprehensive toolkit for creating Google ADK (Agent Development Kit) agents with OAuth authentication, A2A (Agent-to-Agent) protocol integration, and multi-agent orchestration capabilities.
+A comprehensive toolkit for creating Google ADK (Agent Development Kit) agents with OAuth authentication, MCP (Model Context Protocol) toolkit integration, A2A (Agent-to-Agent) protocol integration, and multi-agent orchestration capabilities.
 
 ## 📁 Repository Structure
 
@@ -19,6 +19,8 @@ agent-factory/
 
 **Contents**:
 - **Complete agent implementation** with OAuth authentication and A2A protocol
+- **Tool Registry System** for centralized tool management and configuration
+- **MCP Toolkit Integration** with automatic JWT token management
 - **Modular architecture** supporting standalone and multi-agent modes
 - **Testing suite** for authentication forwarding and multi-agent scenarios
 - **Deployment configurations** for various environments
@@ -29,10 +31,12 @@ agent-factory/
 3. Customize tools and configuration for your specific use case
 
 **Key files**:
-- `src/agent.py` - Main agent implementation
-- `src/tools/` - Agent tools and capabilities
+- `src/agent.py` - Main agent implementation with tool registry integration
+- `src/tools/` - Agent tools, MCP toolkit, and tool registry system
+- `config/tool_registry.yaml` - Tool configuration and management
+- `config/mcp_toolsets.yaml` - MCP toolset configuration
 - `docs/setup.md` - Complete setup instructions
-- `config/` - Configuration files
+- `docs/tool_registry_guide.md` - Tool registry and MCP toolkit guide
 - `testing_scripts/` - Test scripts for validation
 
 ### `agents/`
@@ -174,13 +178,43 @@ cd agent-template/
 ./testing_scripts/run_tests.sh
 ```
 
+## 🛠️ Tool Registry System
+
+The agent template now includes a comprehensive tool management system:
+
+### Features
+- **Centralized Configuration**: YAML-based tool configuration and management
+- **Environment-Specific Settings**: Different tool configurations for dev/staging/production
+- **MCP Integration**: Built-in support for Model Context Protocol toolsets
+- **Automatic Discovery**: Tools are automatically loaded and configured
+- **Authentication Management**: Unified OAuth and JWT token handling
+
+### Quick Start
+```bash
+# Tools are automatically loaded from configuration
+cd agent-template/
+python src/agent.py
+
+# Configure tools in config/tool_registry.yaml and config/mcp_toolsets.yaml
+```
+
+### MCP Toolkit Features
+- **Automatic JWT Token Management**: Handles token refresh and expiration
+- **Tool Caching**: Improves performance by caching discovered tools
+- **Authentication Header Injection**: Automatically adds auth headers to MCP requests
+- **Google Cloud Integration**: Uses Google Cloud credentials for authentication
+
+See `agent-template/docs/tool_registry_guide.md` for detailed usage instructions.
+
 ## 🏗️ Architecture
 
 This toolkit supports both **standalone agents** and **multi-agent orchestration**:
 
-- **Standalone Mode**: Single agent with OAuth authentication
+- **Standalone Mode**: Single agent with OAuth authentication and tool registry
 - **Multi-Agent Mode**: Root agent orchestrating multiple specialized remote agents
 - **A2A Protocol**: Secure agent-to-agent communication with authentication forwarding
+- **MCP Integration**: Model Context Protocol toolsets with automatic authentication
+- **Tool Registry**: Centralized tool management and configuration system
 - **Template-Based**: Consistent agent structure and deployment patterns
 
 ## 📝 Contributing

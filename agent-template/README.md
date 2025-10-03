@@ -1,6 +1,6 @@
 # Agent Template - Multi-Agent OAuth-Authenticated AI Agent
 
-A **production-ready** template for building Google ADK (Agent Development Kit) agents with OAuth authentication, A2A (Agent-to-Agent) protocol integration, and **optional remote agent orchestration**.
+A **production-ready** template for building Google ADK (Agent Development Kit) agents with OAuth authentication, MCP (Model Context Protocol) toolkit integration, A2A (Agent-to-Agent) protocol integration, and **optional remote agent orchestration**.
 
 ## 🎯 Overview
 
@@ -17,14 +17,19 @@ This template provides a complete foundation for creating OAuth-authenticated AI
 - **Authentication Forwarding**: Bearer tokens and OAuth context preserved across agent boundaries
 
 ### 🤖 Agent Capabilities
+- **Tool Registry System**: Centralized tool management with YAML configuration
+- **MCP Toolkit Integration**: Model Context Protocol toolsets with automatic JWT authentication
 - **Optional Remote Agents**: Seamlessly switch between standalone and multi-agent modes
 - **Multi-Agent Orchestration**: Delegate specialized tasks to remote agents with automatic auth forwarding
 - **Google ADK Integration**: Native Gemini model integration with tool execution
 - **A2A Protocol**: Full Agent-to-Agent protocol with official ADK patterns
 
 ### 🏗️ Architecture & Integration
+- **Tool Discovery**: Automatic tool loading from registry configuration
+- **Environment-Aware**: Different tool configurations for dev/staging/production
+- **Performance Optimization**: Tool caching and token management
 - **Flexible Deployment**: Standalone agent or multi-agent orchestrator based on configuration
-- **Real API Integration**: Live data from OAuth provider APIs
+- **Real API Integration**: Live data from OAuth provider APIs and MCP servers
 - **Token Management**: Automatic refresh, secure storage, lifecycle management
 - **Template Structure**: Easy to customize for your specific agent needs
 
@@ -104,10 +109,15 @@ agent-template/
 │       ├── authenticated_tool.py     # AuthenticatedTool base class
 │       ├── example_tool.py          # Example tool with OAuth API integration
 │       ├── auth_validation_tool.py  # Authentication context validation tool
+│       ├── tool_registry.py         # Tool registry system for centralized management
+│       ├── mcp_toolkit.py           # MCP toolkit integration with JWT authentication
+│       ├── __init__.py              # Tool imports and convenience functions
 │       └── examples/                # Additional example tools and patterns
 ├── config/                           # Configuration files
 │   ├── agent_config.yaml           # Agent settings and capabilities
 │   ├── oauth_config.yaml           # OAuth provider configuration
+│   ├── tool_registry.yaml          # Tool registry configuration
+│   ├── mcp_toolsets.yaml           # MCP toolset configuration
 │   └── remote_agents.yaml          # Remote agents configuration (optional)
 ├── deployment/                      # Deployment configurations
 │   ├── agent_engine/               # Google Agent Engine deployment
@@ -115,7 +125,8 @@ agent-template/
 │   ├── docker/                     # Docker configurations
 │   └── scripts/                    # Deployment automation scripts
 ├── docs/                           # Documentation
-│   └── setup.md                   # Complete setup guide
+│   ├── setup.md                   # Complete setup guide
+│   └── tool_registry_guide.md    # Tool registry and MCP toolkit guide
 ├── testing_scripts/               # Testing and validation scripts
 │   └── [various test scripts]     # Authentication, A2A, and integration tests
 ├── .env.example                   # Environment variables template
@@ -139,6 +150,8 @@ agent-template/
 
 - **`agent_config.yaml`**: Agent metadata, capabilities, and behavior settings
 - **`oauth_config.yaml`**: OAuth provider settings (Google, Azure, etc.)
+- **`tool_registry.yaml`**: Tool registry configuration and management
+- **`mcp_toolsets.yaml`**: MCP (Model Context Protocol) toolset configuration
 - **`remote_agents.yaml`**: Optional configuration for remote agent orchestration
 
 ### `deployment/` - Deployment Options
@@ -153,6 +166,7 @@ agent-template/
 **Purpose**: Setup guides and documentation
 
 - **`setup.md`**: Comprehensive setup instructions for the template
+- **`tool_registry_guide.md`**: Detailed guide for tool registry and MCP toolkit usage
 
 ### `testing_scripts/` - Testing & Validation
 **Purpose**: Scripts to test authentication, A2A communication, and agent functionality
@@ -160,6 +174,62 @@ agent-template/
 - Contains various test scripts for validating authentication forwarding
 - A2A protocol testing
 - Integration testing with remote agents
+
+## 🛠️ Tool Registry System
+
+The agent template includes a comprehensive tool management system that supports both traditional authenticated tools and MCP (Model Context Protocol) toolsets.
+
+### Key Features
+
+- **Centralized Configuration**: All tools configured via YAML files
+- **Environment-Specific Settings**: Different configurations for dev/staging/production
+- **Automatic Discovery**: Tools are loaded and configured automatically
+- **MCP Integration**: Built-in support for MCP toolsets with JWT authentication
+- **Performance Optimization**: Tool caching and token management
+
+### Configuration Files
+
+#### `config/tool_registry.yaml`
+```yaml
+tools:
+  example_tool:
+    type: "authenticated"
+    description: "Example OAuth-authenticated tool"
+    enabled: true
+    auth_required: true
+    environments:
+      production:
+        enabled: true
+```
+
+#### `config/mcp_toolsets.yaml`
+```yaml
+mcp_toolsets:
+  weather_toolset:
+    url: "${MCP_SERVER_URL:http://localhost:8080}"
+    description: "Weather forecast toolset"
+    enabled: true
+    auth_required: true
+    auth_header: "X-Serverless-Authorization"
+```
+
+### MCP Toolkit Features
+
+- **Automatic JWT Token Management**: Handles token refresh and expiration
+- **Tool Caching**: Caches discovered tools for performance
+- **Authentication Header Injection**: Automatically adds auth headers
+- **Google Cloud Integration**: Uses Google Cloud credentials
+
+### Usage
+
+Tools are automatically loaded when the agent starts:
+
+```bash
+# Tools loaded from config/tool_registry.yaml and config/mcp_toolsets.yaml
+python src/agent.py
+```
+
+For detailed configuration and usage instructions, see [`docs/tool_registry_guide.md`](docs/tool_registry_guide.md).
 
 ## 🚀 Quick Start
 

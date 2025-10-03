@@ -26,6 +26,8 @@ from auth.auth_config import load_auth_config
 from agent_a2a.server import create_authenticated_a2a_server
 from tools.authenticated_tool import AuthenticatedTool
 from tools.example_tool import ExampleTool, BearerTokenPrintTool
+from tools.tool_registry import get_tool_registry, create_tools_from_registry
+from tools.mcp_toolkit import MCPToolsetWithAuth, create_mcp_auth_callback
 from agent_factory.remote_agent_factory import AuthenticatedRemoteAgentFactory
 
 # Configure logging
@@ -51,52 +53,80 @@ async def create_agent() -> Agent:
 
     logger.info(f"Creating agent: {agent_name} (env: {environment})")
 
-    # Create tools (customize this section for your specific agent)
-    example_tool = ExampleTool()
-    bearer_token_print_tool = BearerTokenPrintTool()
+    # Load tools from registry (combines traditional and MCP tools)
+    config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
+    tools = create_tools_from_registry(config_dir, environment)
 
-    # Convert to FunctionTool for ADK - tools will access user context from session state
-    example_function_tool = FunctionTool(example_tool.execute_with_context)
-    bearer_token_print_function_tool = FunctionTool(bearer_token_print_tool.execute_with_context)
+    # Get registry for additional tool management
+    tool_registry = get_tool_registry(config_dir, environment)
 
-    tools = [example_function_tool, bearer_token_print_function_tool]
+    # Log tool information
+    tool_status = tool_registry.get_tool_status()
+    logger.info(f"📋 Loaded {tool_status['registered_tools']} tools from registry")
+
+    # Create MCP auth callback if we have MCP toolsets
+    mcp_toolsets = [tool for tool in tool_registry.tools.values() if isinstance(tool, MCPToolsetWithAuth)]
+    mcp_auth_callback = create_mcp_auth_callback(mcp_toolsets) if mcp_toolsets else None
+
+    if mcp_toolsets:
+        logger.info(f"🔧 Created MCP auth callback for {len(mcp_toolsets)} toolsets")
 
     # Load remote agents if configured (optional) with authentication forwarding
-    config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
     remote_factory = AuthenticatedRemoteAgentFactory(config_dir)
 
     # Load remote agents without auth context initially
     # Authentication context will be added dynamically per request
     remote_agents = await remote_factory.load_remote_agents_if_configured()
 
-    # Build dynamic instruction based on available remote agents
-    instruction = _build_agent_instruction(agent_name, remote_agents)
+    # Build dynamic instruction based on available remote agents and tools
+    instruction = _build_agent_instruction(agent_name, remote_agents, tool_registry)
 
-    # Import the callback
+    # Import the primary auth callback
     from auth.agent_auth_callback import auth_context_callback
 
-    # Create agent with optional sub-agents and auth callback
+    # Create combined auth callback (OAuth + MCP)
+    def combined_auth_callback(callback_context):
+        """Combined callback for OAuth context and MCP auth injection."""
+        # First handle OAuth context injection for remote agents
+        auth_context_callback(callback_context)
+
+        # Then handle MCP authentication if we have MCP toolsets
+        if mcp_auth_callback:
+            mcp_auth_callback(callback_context)
+
+        return None
+
+    # Create agent with optional sub-agents and combined auth callback
     agent = Agent(
         model=model_name,
         name=agent_name,
         instruction=instruction,
         tools=tools,
         sub_agents=remote_agents if remote_agents else None,  # Only add if configured
-        description=f"{agent_name} with OAuth authentication and A2A protocol support",
-        before_agent_callback=auth_context_callback  # ADD THIS LINE
+        description=f"{agent_name} with OAuth authentication, MCP toolkit, and A2A protocol support",
+        before_agent_callback=combined_auth_callback
     )
 
-    # Store the remote factory on the agent for runtime auth context injection
+    # Store the remote factory and tool registry on the agent for runtime access
     agent._remote_factory = remote_factory
     agent._config_dir = config_dir
+    agent._tool_registry = tool_registry
 
     # Log agent creation details
+    tool_count = len(tools)
+    mcp_count = len(mcp_toolsets)
+    traditional_count = tool_count - mcp_count
+
+    logger.info(f"✅ Created agent with {tool_count} total tools:")
+    logger.info(f"   - {traditional_count} traditional authenticated tools")
+    logger.info(f"   - {mcp_count} MCP toolsets")
+
     if remote_agents:
-        logger.info(f"✅ Created agent with {len(remote_agents)} remote sub-agents:")
+        logger.info(f"✅ Agent has {len(remote_agents)} remote sub-agents:")
         for remote_agent in remote_agents:
             logger.info(f"   - {remote_agent.name}: {remote_agent.description}")
     else:
-        logger.info("✅ Created agent in standalone mode (no remote agents)")
+        logger.info("📱 Agent in standalone mode (no remote agents)")
 
     return agent
 
@@ -144,8 +174,8 @@ async def reload_agent_with_auth_context(agent: Agent, auth_context: Optional[Di
         return agent
 
 
-def _build_agent_instruction(agent_name: str, remote_agents: List) -> str:
-    """Build dynamic instruction based on available remote agents."""
+def _build_agent_instruction(agent_name: str, remote_agents: List, tool_registry=None) -> str:
+    """Build dynamic instruction based on available remote agents and tools."""
     base_instruction = f"""
 You are {agent_name}, an AI assistant with secure OAuth authentication capabilities.
 
@@ -155,6 +185,7 @@ Key capabilities:
 - Secure OAuth authentication with multiple providers (Google, Azure, Okta, custom)
 - Access to authenticated APIs and user data
 - Agent-to-Agent (A2A) protocol communication
+- MCP (Model Context Protocol) toolkit integration
 - Secure token management and user data protection
 
 When users need authenticated services:
@@ -163,9 +194,29 @@ When users need authenticated services:
 3. Format responses in a user-friendly way
 4. Respect their privacy and only access authorized data
 
-Available tools:
-- example_tool: Example authenticated tool (customize for your needs)
-- bearer_token_print_tool: Testing tool that prints received bearer token information"""
+🛠️ Available Tools:"""
+
+    # Add tool information from registry
+    if tool_registry:
+        available_tools = tool_registry.list_available_tools()
+        if available_tools:
+            tools_section = "\n"
+            traditional_tools = []
+            mcp_tools = []
+
+            for tool_name, tool_info in available_tools.items():
+                if tool_info.get("type") == "mcp":
+                    mcp_tools.append(f"- {tool_name}: {tool_info.get('description', 'MCP toolset')}")
+                else:
+                    traditional_tools.append(f"- {tool_name}: {tool_info.get('description', 'Authenticated tool')}")
+
+            if traditional_tools:
+                tools_section += "\n🔧 Authentication Tools:\n" + "\n".join(traditional_tools)
+
+            if mcp_tools:
+                tools_section += "\n\n🌐 MCP Toolsets:\n" + "\n".join(mcp_tools)
+
+            base_instruction += tools_section
 
     if remote_agents:
         delegation_instruction = f"""

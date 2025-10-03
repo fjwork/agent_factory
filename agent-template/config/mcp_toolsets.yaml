@@ -1,0 +1,138 @@
+# MCP Toolsets Configuration
+# This file defines MCP (Model Context Protocol) toolsets available to the agent
+
+mcp_toolsets:
+  # Weather toolset example (based on your sample code)
+  weather_toolset:
+    url: "${MCP_SERVER_URL:http://localhost:8080}"
+    description: "Weather forecast and information toolset"
+    enabled: "${ENABLE_WEATHER_MCP:true}"
+    timeout: 60
+    auth_required: true
+    auth_header: "X-Serverless-Authorization"
+    token_refresh_threshold_mins: "${TOKEN_REFRESH_THRESHOLD_MINS:15}"
+    headers:
+      User-Agent: "agent-template-weather-client"
+    environments:
+      development:
+        enabled: true
+        url: "http://localhost:8080"
+      staging:
+        enabled: true
+        url: "${STAGING_MCP_SERVER_URL}"
+      production:
+        enabled: true
+        url: "${PROD_MCP_SERVER_URL}"
+
+  # Additional MCP toolsets can be defined here
+  data_analysis_toolset:
+    url: "${DATA_ANALYSIS_MCP_URL}"
+    description: "Data analysis and visualization toolset"
+    enabled: false  # Disabled by default
+    timeout: 120
+    auth_required: true
+    auth_header: "Authorization"
+    token_refresh_threshold_mins: 10
+    headers:
+      Content-Type: "application/json"
+    environments:
+      development:
+        enabled: false
+      production:
+        enabled: false
+
+  notification_toolset:
+    url: "${NOTIFICATION_MCP_URL}"
+    description: "Notification and messaging toolset"
+    enabled: false
+    timeout: 30
+    auth_required: true
+    auth_header: "X-API-Key"
+    token_refresh_threshold_mins: 20
+    environments:
+      development:
+        enabled: false
+      production:
+        enabled: false
+
+  # File processing toolset
+  file_processor_toolset:
+    url: "${FILE_PROCESSOR_MCP_URL}"
+    description: "File upload, processing, and management"
+    enabled: false
+    timeout: 180  # Longer timeout for file operations
+    auth_required: true
+    auth_header: "X-Serverless-Authorization"
+    token_refresh_threshold_mins: 15
+    headers:
+      Accept: "application/json"
+    environments:
+      development:
+        enabled: false
+        timeout: 60  # Shorter timeout in dev
+      production:
+        enabled: false
+
+# Global MCP settings
+global_settings:
+  # Default timeout for all MCP connections
+  default_timeout: 60
+
+  # Default authentication settings
+  default_auth:
+    required: true
+    header: "X-Serverless-Authorization"
+    token_refresh_threshold_mins: 15
+
+  # Connection pooling settings
+  connection_pool:
+    max_connections: 10
+    max_keepalive_connections: 5
+
+  # Retry settings
+  retry:
+    max_attempts: 3
+    backoff_factor: 2
+    max_backoff: 30
+
+# Environment-specific global overrides
+environments:
+  development:
+    global_settings:
+      default_timeout: 30
+      retry:
+        max_attempts: 1  # Fail fast in development
+
+  staging:
+    global_settings:
+      default_timeout: 90
+      retry:
+        max_attempts: 2
+
+  production:
+    global_settings:
+      default_timeout: 120
+      retry:
+        max_attempts: 3
+        max_backoff: 60
+
+# MCP toolset categories for organization
+categories:
+  weather:
+    description: "Weather and environmental data"
+    toolsets: ["weather_toolset"]
+
+  data:
+    description: "Data processing and analysis"
+    toolsets: ["data_analysis_toolset", "file_processor_toolset"]
+
+  communication:
+    description: "Notifications and messaging"
+    toolsets: ["notification_toolset"]
+
+# Health check configuration for MCP services
+health_checks:
+  enabled: true
+  interval_seconds: 300  # Check every 5 minutes
+  timeout_seconds: 10
+  retry_attempts: 2
