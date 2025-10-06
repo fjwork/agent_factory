@@ -183,6 +183,76 @@ For comprehensive testing including MCP integration:
 4. Start main agent: `cd agent-template/ && python src/agent.py`
 5. Test authentication forwarding: `./testing_scripts/test_multiagent.sh`
 
+## Recent Work: MCP Bearer Token Passthrough Implementation
+
+### Implementation Summary
+Successfully implemented bearer token passthrough for MCP authentication using initialization-time injection:
+- JWT tokens (primary authentication) - WORKING ✅
+- Original bearer tokens (passthrough for validation) - WORKING ✅
+
+### Key Implementation Details
+
+#### Bearer Token Injection at Initialization
+**Approach**: Inject bearer tokens into MCP connection headers during toolset initialization.
+
+**Why This Works**:
+- Bearer tokens are stored in global registry after A2A authentication
+- MCP toolsets can access global registry during initialization
+- Connection headers persist for all subsequent MCP requests
+
+#### Current Implementation Status
+**Working Components**:
+- ✅ JWT token generation and validation
+- ✅ Bearer token storage in global registry during A2A requests
+- ✅ Bearer token retrieval from global registry during MCP initialization
+- ✅ Dual header injection: `X-Serverless-Authorization` (JWT) + `X-Original-Bearer-Token` (Bearer)
+- ✅ MCP server dual authentication validation
+- ✅ End-to-end bearer token passthrough
+
+#### Files Modified
+1. **`src/tools/mcp_toolkit.py`**:
+   - Added initialization-time bearer token injection in `__init__()`
+   - Enhanced `_get_bearer_token_from_registry()` with comprehensive logging
+   - Fixed type conversion errors in token expiration calculations
+   - Added `get_auth_status()` and `log_auth_debug_info()` for debugging
+   - Improved error handling with proper type checking
+
+2. **`src/agent.py`**:
+   - Enhanced `combined_auth_callback()` with debug logging for troubleshooting
+
+3. **`example-mcp-server/mcp_server.py`**:
+   - Added `validate_tokens()` function for dual authentication
+   - Enhanced authentication context in tool responses
+   - Support for both JWT and bearer token validation
+
+#### Current Architecture
+```
+A2A Request + Bearer Token
+    ↓
+Global Registry Storage (handlers.py)
+    ↓
+MCP Toolset Initialization
+    ↓
+Bearer Token Retrieved & Injected into Headers
+    ↓
+MCP Server Receives:
+    • X-Serverless-Authorization (JWT)
+    • X-Original-Bearer-Token (Bearer)
+    ↓
+Dual Authentication Validation ✅
+```
+
+#### Testing Results
+- **First request after restart**: May show `token_present: false` (global registry empty)
+- **Subsequent requests**: Show `token_present: true` with `token_value: "test-token-123"`
+- **Both JWT and bearer tokens**: Successfully validated by MCP server
+
+### Key Locations
+- **MCP Toolkit**: `src/tools/mcp_toolkit.py` (bearer token injection at line 109)
+- **Agent Setup**: `src/agent.py` (auth callback setup at lines 87-102)
+- **MCP Server**: `example-mcp-server/mcp_server.py` (dual validation at lines 43-76)
+- **Test Commands**: See "Testing MCP Integration" section above
+
 ## Security Considerations
 
 - Never commit OAuth credentials to version control

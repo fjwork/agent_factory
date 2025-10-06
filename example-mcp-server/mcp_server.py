@@ -40,6 +40,42 @@ server = FastMCP(
     log_level="INFO"
 )
 
+def validate_tokens(headers: Dict[str, str]) -> Dict[str, Any]:
+    """
+    Validate both JWT token and original bearer token from request headers.
+
+    Args:
+        headers: The request headers dict
+
+    Returns:
+        Dict containing validation results for both tokens
+    """
+    result = {
+        "jwt_auth": None,
+        "bearer_auth": None,
+        "primary_auth": None
+    }
+
+    # Validate JWT token (primary authentication)
+    jwt_result = validate_jwt_token(headers)
+    result["jwt_auth"] = jwt_result
+    result["primary_auth"] = jwt_result  # JWT remains primary
+
+    # Check for original bearer token (passthrough)
+    original_bearer = headers.get("x-original-bearer-token")
+    if original_bearer:
+        result["bearer_auth"] = {
+            "token_present": True,
+            "token_value": original_bearer,
+            "validation": "passthrough - not validated in this example"
+        }
+        logger.info(f"Received original bearer token: {original_bearer}")
+    else:
+        result["bearer_auth"] = {"token_present": False}
+
+    return result
+
+
 def validate_jwt_token(headers: Dict[str, str]) -> Optional[Dict[str, Any]]:
     """
     Validate JWT token from request headers.
@@ -152,15 +188,19 @@ async def get_weather(location: str) -> Dict[str, Any]:
     Returns:
         Weather information including temperature, conditions, and forecast
     """
-    # Validate authentication
+    # Validate authentication (both JWT and bearer token)
     try:
         headers = get_http_headers()
-        user_info = validate_jwt_token(headers)
-        if not user_info:
+        auth_result = validate_tokens(headers)
+
+        # Check JWT authentication (primary)
+        if not auth_result["primary_auth"]:
             return {
                 "error": "Authentication required for weather data",
                 "location": location
             }
+
+        user_info = auth_result["primary_auth"]
     except Exception as e:
         logger.error(f"Error accessing request headers: {e}")
         return {
@@ -172,7 +212,21 @@ async def get_weather(location: str) -> Dict[str, Any]:
 
     try:
         weather_data = get_weather_data(location)
-        weather_data["authenticated_user"] = user_info.get("email", "unknown")
+
+        # Add detailed authentication information (both JWT and bearer token)
+        weather_data["authentication_context"] = {
+            "authenticated_user": user_info.get("email", "unknown"),
+            "primary_auth_method": "JWT",
+            "jwt_valid": True,
+            "jwt_user_info": {
+                "email": user_info.get("email", "unknown"),
+                "iat": user_info.get("iat"),
+                "exp": user_info.get("exp"),
+                "aud": user_info.get("aud"),
+                "iss": user_info.get("iss")
+            },
+            "bearer_token_info": auth_result["bearer_auth"]
+        }
         return weather_data
     except Exception as e:
         logger.error(f"Error getting weather data: {e}")
@@ -194,15 +248,19 @@ async def search_news(query: str) -> Dict[str, Any]:
     Returns:
         News articles and information related to the query
     """
-    # Validate authentication
+    # Validate authentication (both JWT and bearer token)
     try:
         headers = get_http_headers()
-        user_info = validate_jwt_token(headers)
-        if not user_info:
+        auth_result = validate_tokens(headers)
+
+        # Check JWT authentication (primary)
+        if not auth_result["primary_auth"]:
             return {
                 "error": "Authentication required for news search",
                 "query": query
             }
+
+        user_info = auth_result["primary_auth"]
     except Exception as e:
         logger.error(f"Error accessing request headers: {e}")
         return {
@@ -214,7 +272,21 @@ async def search_news(query: str) -> Dict[str, Any]:
 
     try:
         news_data = search_news_data(query)
-        news_data["authenticated_user"] = user_info.get("email", "unknown")
+
+        # Add detailed authentication information (both JWT and bearer token)
+        news_data["authentication_context"] = {
+            "authenticated_user": user_info.get("email", "unknown"),
+            "primary_auth_method": "JWT",
+            "jwt_valid": True,
+            "jwt_user_info": {
+                "email": user_info.get("email", "unknown"),
+                "iat": user_info.get("iat"),
+                "exp": user_info.get("exp"),
+                "aud": user_info.get("aud"),
+                "iss": user_info.get("iss")
+            },
+            "bearer_token_info": auth_result["bearer_auth"]
+        }
         return news_data
     except Exception as e:
         logger.error(f"Error searching news: {e}")

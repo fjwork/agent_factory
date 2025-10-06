@@ -276,6 +276,58 @@ curl -X POST http://localhost:8001/ \
 
 **✅ Expected Result:** Should successfully execute the simple_test tool and return a success message, proving basic MCP connectivity works.
 
+### Test 6: MCP News Tool (with Bearer Token)
+
+```bash
+# Test MCP news search tool with bearer token authentication
+curl -X POST http://localhost:8001/ \
+  -H "Authorization: Bearer test-token-123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "test-news-1",
+    "method": "message/send",
+    "params": {
+      "context_id": "test-news-1",
+      "message": {
+        "messageId": "news-test",
+        "role": "user",
+        "parts": [{
+          "text": "Search for news about artificial intelligence"
+        }]
+      }
+    }
+  }'
+```
+
+**✅ Expected Result:** Should successfully execute the search_news tool, return news articles about AI, and show authentication context with user information.
+
+### Test 7: Profile Tool (with Bearer Token)
+
+```bash
+# Test profile tool with bearer token authentication
+curl -X POST http://localhost:8001/ \
+  -H "Authorization: Bearer test-token-123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "test-profile-1",
+    "method": "message/send",
+    "params": {
+      "context_id": "test-profile-1",
+      "message": {
+        "messageId": "profile-test",
+        "role": "user",
+        "parts": [{
+          "text": "Get my user profile information"
+        }]
+      }
+    }
+  }'
+```
+
+**✅ Expected Result:** Should execute the profile tool and return user profile information including email, name, and authentication provider details.
+
 ## 🔍 What to Look For
 
 ### In Main Agent Logs (Terminal 3):

@@ -87,12 +87,17 @@ async def create_agent() -> Agent:
     # Create combined auth callback (OAuth + MCP)
     def combined_auth_callback(callback_context):
         """Combined callback for OAuth context and MCP auth injection."""
+        logger.info(f"🎯 Combined auth callback invoked")
+
         # First handle OAuth context injection for remote agents
         auth_context_callback(callback_context)
 
         # Then handle MCP authentication if we have MCP toolsets
         if mcp_auth_callback:
+            logger.info(f"🔧 Calling MCP auth callback")
             mcp_auth_callback(callback_context)
+        else:
+            logger.warning(f"❌ No MCP auth callback configured")
 
         return None
 

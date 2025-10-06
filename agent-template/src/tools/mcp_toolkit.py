@@ -99,21 +99,35 @@ class MCPToolsetWithAuth(MCPToolset):
             logger.error(f"URL concatenation error: {e}, url={url}, type={type(url)}")
             raise
 
+        # Prepare headers including bearer token at initialization time
+        initial_headers = headers or {}
+
+        # Store name first so we can use it in bearer token retrieval
+        self._tool_set_name = name
+
+        # Attempt to get bearer token during initialization (if available)
+        bearer_token = self._get_bearer_token_at_init(name)
+        if bearer_token:
+            initial_headers["X-Original-Bearer-Token"] = bearer_token
+            logger.info(f"🎯 Set bearer token in connection headers during init for {name}: {bearer_token}")
+        else:
+            logger.debug(f"🔍 No bearer token available during initialization for {name} (will be injected dynamically during auth callbacks)")
+
         connection_params = StreamableHTTPConnectionParams(
             url=final_url,
             timeout=timeout,
-            headers=headers or {}
+            headers=initial_headers
         )
 
-        # Initialize parent class
-        super().__init__(connection_params=connection_params)
-
-        # Store authentication configuration
-        self._tool_set_name = name
+        # Store authentication configuration BEFORE parent init
+        # (tool_set_name already set above for bearer token retrieval)
         self.auth_required = auth_required
         self.auth_header = auth_header
         self.token_refresh_threshold_mins = token_refresh_threshold_mins
         self.base_url = url
+
+        # Initialize parent class
+        super().__init__(connection_params=connection_params)
 
         # Initialize cache entry for this toolset
         if self._tool_set_name not in toolset_cache:
@@ -161,7 +175,10 @@ class MCPToolsetWithAuth(MCPToolset):
         Inject authentication token into MCP connection headers.
 
         This method follows the pattern from your sample code for token management.
+        Now supports dual headers: JWT (primary) + original bearer token (passthrough).
         """
+        logger.info(f"🚀 MCP auth callback invoked for {self._tool_set_name}")
+
         if not self.auth_required:
             logger.debug(f"Authentication not required for {self._tool_set_name}")
             return None
@@ -169,42 +186,179 @@ class MCPToolsetWithAuth(MCPToolset):
         try:
             cache_entry = toolset_cache[self._tool_set_name]
 
-            # Check if token was never added or needs refresh
+            # Handle JWT token (primary authentication)
             if not self._has_valid_token(cache_entry):
-                logger.info(f"Getting new token for {self._tool_set_name}")
+                logger.info(f"Getting new JWT token for {self._tool_set_name}")
                 self._refresh_token(cache_entry)
             else:
-                logger.debug(f"Using cached valid token for {self._tool_set_name}")
+                logger.debug(f"Using cached JWT token for {self._tool_set_name}")
                 self._apply_cached_token(cache_entry)
+
+            # Handle bearer token passthrough (secondary authentication)
+            logger.info(f"🔄 Starting bearer token passthrough for {self._tool_set_name}")
+            self._inject_bearer_token()
+
+            # Log comprehensive auth status for debugging
+            logger.info(f"🔍 Logging comprehensive auth status for {self._tool_set_name}")
+            self.log_auth_debug_info()
+
+            logger.info(f"✅ Dual auth injection completed for {self._tool_set_name}")
 
         except Exception as e:
             logger.error(f"Failed to inject auth token for {self._tool_set_name}: {e}")
 
         return None
 
+    def _inject_bearer_token(self) -> None:
+        """
+        Inject bearer token into MCP connection headers during auth callback.
+
+        This method retrieves the bearer token from the global registry and
+        dynamically updates the connection headers with X-Original-Bearer-Token.
+        """
+        logger.debug(f"🔍 Starting bearer token injection for {self._tool_set_name}")
+
+        try:
+            # Retrieve bearer token from global registry
+            logger.debug(f"🔄 Attempting to retrieve bearer token from global registry for {self._tool_set_name}")
+            bearer_token = self._get_bearer_token_from_registry()
+
+            if bearer_token:
+                logger.info(f"✅ Retrieved bearer token for {self._tool_set_name}: {bearer_token}")
+
+                # Ensure connection headers exist
+                if not self._connection_params.headers:
+                    logger.debug(f"🔧 Creating new headers dict for {self._tool_set_name}")
+                    self._connection_params.headers = {}
+                else:
+                    logger.debug(f"🔧 Using existing headers dict for {self._tool_set_name} (current count: {len(self._connection_params.headers)})")
+
+                # Inject bearer token header
+                self._connection_params.headers["X-Original-Bearer-Token"] = bearer_token
+                logger.info(f"✅ Injected bearer token into connection headers for {self._tool_set_name}")
+
+                # Log current headers for debugging (sanitized)
+                headers_summary = {}
+                for k, v in self._connection_params.headers.items():
+                    if k in ["X-Serverless-Authorization", "X-Original-Bearer-Token"]:
+                        if v and len(v) > 10:
+                            headers_summary[k] = f"{v[:6]}...{v[-4:]}"
+                        else:
+                            headers_summary[k] = v
+                    else:
+                        headers_summary[k] = v
+                logger.info(f"🔍 Current auth headers for {self._tool_set_name}: {headers_summary}")
+            else:
+                logger.warning(f"❌ No bearer token available for injection in {self._tool_set_name}")
+
+        except Exception as e:
+            logger.error(f"💥 Failed to inject bearer token for {self._tool_set_name}: {e}")
+            import traceback
+            logger.error(f"💥 Stack trace: {traceback.format_exc()}")
+
+    def _get_bearer_token_from_registry(self) -> Optional[str]:
+        """
+        Get bearer token from global auth registry with improved error handling.
+
+        Returns:
+            Bearer token string if available, None otherwise
+        """
+        logger.debug(f"🔍 Entering _get_bearer_token_from_registry for {self._tool_set_name}")
+
+        try:
+            # Import the handler class to access its global registry
+            logger.debug(f"🔄 Importing AuthenticatedRequestHandler for {self._tool_set_name}")
+            from agent_a2a.handlers import AuthenticatedRequestHandler
+
+            # Check if the registry exists and has any entries
+            if not hasattr(AuthenticatedRequestHandler, '_oauth_registry'):
+                logger.warning(f"❌ No _oauth_registry attribute found on AuthenticatedRequestHandler for {self._tool_set_name}")
+                return None
+
+            registry = AuthenticatedRequestHandler._oauth_registry
+            logger.debug(f"🔍 Registry type: {type(registry)}, registry: {registry}")
+
+            if not registry:
+                logger.warning(f"❌ Global auth registry is empty for {self._tool_set_name}")
+                return None
+
+            logger.info(f"✅ Found global registry with {len(registry)} entries for {self._tool_set_name}")
+
+            # Get the most recent auth context (assuming latest is most relevant)
+            user_id, oauth_context = next(iter(registry.items()))
+            logger.info(f"🔍 Checking auth context for user: {user_id}")
+            logger.debug(f"🔍 OAuth context keys: {list(oauth_context.keys())}")
+            logger.debug(f"🔍 OAuth context: {oauth_context}")
+
+            # Extract bearer token
+            bearer_token = oauth_context.get('oauth_token')
+            if bearer_token:
+                logger.info(f"✅ Retrieved bearer token for user {user_id} in {self._tool_set_name}: {bearer_token}")
+                return bearer_token
+            else:
+                logger.warning(f"❌ No oauth_token found in auth context for {user_id}")
+                logger.debug(f"❌ Available keys in context: {list(oauth_context.keys())}")
+                return None
+
+        except Exception as e:
+            logger.error(f"💥 Failed to get bearer token from registry for {self._tool_set_name}: {e}")
+            import traceback
+            logger.error(f"💥 Stack trace: {traceback.format_exc()}")
+            return None
+
+    def _get_bearer_token_at_init(self, toolset_name: str) -> Optional[str]:
+        """
+        Get bearer token from global auth registry during toolset initialization.
+
+        This method is called during initialization but typically returns None
+        since bearer tokens are stored only after authenticated requests arrive.
+        Left for potential future use or when tokens are pre-populated.
+
+        Args:
+            toolset_name: Name of the toolset for logging purposes
+        """
+        # Delegate to the main bearer token retrieval method
+        token = self._get_bearer_token_from_registry()
+        if token:
+            logger.info(f"✅ Found bearer token during init for {toolset_name}: {token}")
+        else:
+            logger.debug(f"ℹ️ No bearer token available during init for {toolset_name} (expected - tokens come after auth)")
+        return token
+
+
+
     def _has_valid_token(self, cache_entry: Dict[str, Any]) -> bool:
         """Check if we have a valid, non-expired token."""
         if "token_expiration_time" not in cache_entry:
             return False
 
-        # Check if token will expire within threshold
-        time_after_threshold = (
-            int(time.time()) + self.token_refresh_threshold_mins * 60
-        )
+        try:
+            # Ensure all values are integers for proper calculation
+            current_time = int(time.time())
+            threshold_mins = int(self.token_refresh_threshold_mins)
+            expiration_time = int(cache_entry["token_expiration_time"])
 
-        expiration_time = cache_entry["token_expiration_time"]
-        is_valid = time_after_threshold < expiration_time
+            # Check if token will expire within threshold
+            time_after_threshold = current_time + (threshold_mins * 60)
 
-        logger.debug(
-            f"Token expires at {expiration_time}, "
-            f"threshold time: {time_after_threshold}, "
-            f"valid: {is_valid}"
-        )
+            is_valid = time_after_threshold < expiration_time
 
-        return is_valid
+            logger.debug(
+                f"Token expires at {expiration_time}, "
+                f"current time: {current_time}, "
+                f"threshold time: {time_after_threshold}, "
+                f"valid: {is_valid}"
+            )
+
+            return is_valid
+
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error in token expiration calculation for {self._tool_set_name}: {e}")
+            # If we can't calculate expiration, assume token is invalid
+            return False
 
     def _refresh_token(self, cache_entry: Dict[str, Any]):
-        """Refresh authentication token."""
+        """Refresh JWT authentication token."""
         try:
             # Get new ID token
             id_token = self._get_id_token(self.base_url)
@@ -218,8 +372,11 @@ class MCPToolsetWithAuth(MCPToolset):
             except Exception:
                 decoded_payload = decode_jwt_no_verify(id_token)
 
-            # Update connection headers
-            self._connection_params.headers = self._connection_params.headers or {}
+            # Ensure headers dict exists
+            if not self._connection_params.headers:
+                self._connection_params.headers = {}
+
+            # Update connection headers with JWT token
             bearer_token = f"Bearer {id_token}"
             self._connection_params.headers[self.auth_header] = bearer_token
 
@@ -227,20 +384,26 @@ class MCPToolsetWithAuth(MCPToolset):
             cache_entry["prev_used_token"] = bearer_token
             cache_entry["token_expiration_time"] = decoded_payload["exp"]
 
-            logger.info(f"Successfully refreshed token for {self._tool_set_name}")
-            logger.debug(f"Token expires at: {decoded_payload['exp']}")
+            logger.info(f"Successfully refreshed JWT token for {self._tool_set_name}")
+            logger.debug(f"JWT token expires at: {decoded_payload['exp']}")
 
         except Exception as e:
-            logger.error(f"Failed to refresh token for {self._tool_set_name}: {e}")
+            logger.error(f"Failed to refresh JWT token for {self._tool_set_name}: {e}")
             raise
 
     def _apply_cached_token(self, cache_entry: Dict[str, Any]):
-        """Apply cached token to connection headers."""
+        """Apply cached JWT token to connection headers."""
         cached_token = cache_entry.get("prev_used_token")
         if cached_token:
-            self._connection_params.headers = self._connection_params.headers or {}
+            # Ensure headers dict exists
+            if not self._connection_params.headers:
+                self._connection_params.headers = {}
+
+            # Apply JWT token
             self._connection_params.headers[self.auth_header] = cached_token
-            logger.debug(f"Applied cached token for {self._tool_set_name}")
+            logger.debug(f"Applied cached JWT token for {self._tool_set_name}")
+        else:
+            logger.warning(f"No cached JWT token found for {self._tool_set_name}")
 
     def _get_id_token(self, audience: str) -> str:
         """
@@ -273,6 +436,83 @@ class MCPToolsetWithAuth(MCPToolset):
             "current_time": int(time.time()),
             "token_valid": self._has_valid_token(cache_entry) if "token_expiration_time" in cache_entry else False
         }
+
+    def get_auth_status(self) -> Dict[str, Any]:
+        """
+        Get comprehensive authentication status for debugging.
+
+        Returns:
+            Dictionary containing JWT and bearer token status
+        """
+        try:
+            # JWT token status
+            cache_entry = toolset_cache.get(self._tool_set_name, {})
+            jwt_status = {
+                "has_jwt_token": "prev_used_token" in cache_entry,
+                "jwt_expiration": cache_entry.get("token_expiration_time"),
+                "jwt_valid": self._has_valid_token(cache_entry) if "token_expiration_time" in cache_entry else False
+            }
+
+            # Bearer token status
+            bearer_token = self._get_bearer_token_from_registry()
+            bearer_status = {
+                "bearer_token_available": bearer_token is not None,
+                "bearer_token_value": bearer_token if bearer_token else None
+            }
+
+            # Connection headers status
+            headers_status = {
+                "has_connection_headers": self._connection_params.headers is not None,
+                "jwt_header_present": False,
+                "bearer_header_present": False
+            }
+
+            if self._connection_params.headers:
+                headers_status["jwt_header_present"] = self.auth_header in self._connection_params.headers
+                headers_status["bearer_header_present"] = "X-Original-Bearer-Token" in self._connection_params.headers
+                headers_status["header_count"] = len(self._connection_params.headers)
+
+            return {
+                "toolset_name": self._tool_set_name,
+                "jwt_status": jwt_status,
+                "bearer_status": bearer_status,
+                "headers_status": headers_status,
+                "timestamp": int(time.time())
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get auth status for {self._tool_set_name}: {e}")
+            return {
+                "toolset_name": self._tool_set_name,
+                "error": str(e),
+                "timestamp": int(time.time())
+            }
+
+    def log_auth_debug_info(self) -> None:
+        """Log comprehensive authentication debug information."""
+        try:
+            auth_status = self.get_auth_status()
+            logger.info(f"🔍 Auth Debug Info for {self._tool_set_name}:")
+            logger.info(f"   JWT Status: {auth_status['jwt_status']}")
+            logger.info(f"   Bearer Status: {auth_status['bearer_status']}")
+            logger.info(f"   Headers Status: {auth_status['headers_status']}")
+
+            # Log actual headers (sanitized)
+            if self._connection_params.headers:
+                sanitized_headers = {}
+                for key, value in self._connection_params.headers.items():
+                    if key in ["X-Serverless-Authorization", "X-Original-Bearer-Token"]:
+                        # Show only first/last few characters for security
+                        if value and len(value) > 10:
+                            sanitized_headers[key] = f"{value[:6]}...{value[-4:]}"
+                        else:
+                            sanitized_headers[key] = value
+                    else:
+                        sanitized_headers[key] = value
+                logger.info(f"   Actual Headers: {sanitized_headers}")
+
+        except Exception as e:
+            logger.error(f"Failed to log auth debug info for {self._tool_set_name}: {e}")
 
     def clear_cache(self):
         """Clear cache for this toolset."""
@@ -352,11 +592,18 @@ def create_weather_mcp_toolset(
     if not isinstance(server_url, str):
         server_url = str(server_url)
 
+    # Ensure token refresh threshold is properly converted to int
+    try:
+        token_refresh_mins = int(os.getenv("TOKEN_REFRESH_THRESHOLD_MINS", "15"))
+    except (ValueError, TypeError) as e:
+        logger.warning(f"Invalid TOKEN_REFRESH_THRESHOLD_MINS value, using default 15: {e}")
+        token_refresh_mins = 15
+
     return MCPToolsetWithAuth(
         name=name,
         url=server_url,
         timeout=60,
         auth_required=True,
         auth_header="X-Serverless-Authorization",
-        token_refresh_threshold_mins=int(os.getenv("TOKEN_REFRESH_THRESHOLD_MINS", "15"))
+        token_refresh_threshold_mins=token_refresh_mins
     )
