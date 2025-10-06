@@ -84,9 +84,23 @@ class MCPToolsetWithAuth(MCPToolset):
             token_refresh_threshold_mins: Minutes before expiry to refresh token
             headers: Additional static headers
         """
-        # Create connection parameters
+        # Create connection parameters with robust type handling
+        logger.debug(f"URL type: {type(url)}, URL value: {url}")
+
+        # Ensure URL is always a string
+        if not isinstance(url, str):
+            url = str(url)
+            logger.debug(f"Converted URL to string: {url}")
+
+        try:
+            final_url = url + ("/mcp" if not url.endswith("/mcp") else "")
+            logger.debug(f"Final URL: {final_url}")
+        except TypeError as e:
+            logger.error(f"URL concatenation error: {e}, url={url}, type={type(url)}")
+            raise
+
         connection_params = StreamableHTTPConnectionParams(
-            url=url + ("/mcp" if not url.endswith("/mcp") else ""),
+            url=final_url,
             timeout=timeout,
             headers=headers or {}
         )
@@ -334,6 +348,9 @@ def create_weather_mcp_toolset(
         Configured MCPToolsetWithAuth instance
     """
     server_url = url or os.getenv("MCP_SERVER_URL", "http://localhost:8080")
+    # Ensure server_url is always a string
+    if not isinstance(server_url, str):
+        server_url = str(server_url)
 
     return MCPToolsetWithAuth(
         name=name,

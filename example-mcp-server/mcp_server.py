@@ -13,10 +13,10 @@ from typing import Any, Dict, Optional
 import jwt
 from datetime import datetime
 
-from mcp.server.fastmcp import FastMCP, Context
+from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_http_headers
 from mcp.shared.exceptions import McpError
 from mcp.types import INVALID_PARAMS, ErrorData
-from starlette.requests import Request
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -40,12 +40,12 @@ server = FastMCP(
     log_level="INFO"
 )
 
-def validate_jwt_token(request: Request) -> Optional[Dict[str, Any]]:
+def validate_jwt_token(headers: Dict[str, str]) -> Optional[Dict[str, Any]]:
     """
     Validate JWT token from request headers.
 
     Args:
-        request: The incoming request
+        headers: The request headers dict
 
     Returns:
         Dict containing user info if valid, None if invalid
@@ -53,9 +53,9 @@ def validate_jwt_token(request: Request) -> Optional[Dict[str, Any]]:
     try:
         # Check for JWT token in various headers
         auth_header = (
-            request.headers.get("X-Serverless-Authorization") or
-            request.headers.get("Authorization") or
-            request.headers.get("X-Auth-Token")
+            headers.get("x-serverless-authorization") or
+            headers.get("authorization") or
+            headers.get("x-auth-token")
         )
 
         if not auth_header:
@@ -142,7 +142,7 @@ def search_news_data(query: str) -> Dict[str, Any]:
     return news_data
 
 @server.tool()
-async def get_weather(context: Context, location: str) -> Dict[str, Any]:
+async def get_weather(location: str) -> Dict[str, Any]:
     """
     Get current weather information for a location.
 
@@ -153,14 +153,20 @@ async def get_weather(context: Context, location: str) -> Dict[str, Any]:
         Weather information including temperature, conditions, and forecast
     """
     # Validate authentication
-    user_info = validate_jwt_token(context.meta.request)
-    if not user_info:
-        raise McpError(
-            ErrorData(
-                code=INVALID_PARAMS.code,
-                message="Authentication required for weather data"
-            )
-        )
+    try:
+        headers = get_http_headers()
+        user_info = validate_jwt_token(headers)
+        if not user_info:
+            return {
+                "error": "Authentication required for weather data",
+                "location": location
+            }
+    except Exception as e:
+        logger.error(f"Error accessing request headers: {e}")
+        return {
+            "error": f"Request header error: {str(e)}",
+            "location": location
+        }
 
     logger.info(f"Weather request from user {user_info.get('email', 'unknown')} for location: {location}")
 
@@ -178,7 +184,7 @@ async def get_weather(context: Context, location: str) -> Dict[str, Any]:
         )
 
 @server.tool()
-async def search_news(context: Context, query: str) -> Dict[str, Any]:
+async def search_news(query: str) -> Dict[str, Any]:
     """
     Search for news articles on a specific topic.
 
@@ -189,14 +195,20 @@ async def search_news(context: Context, query: str) -> Dict[str, Any]:
         News articles and information related to the query
     """
     # Validate authentication
-    user_info = validate_jwt_token(context.meta.request)
-    if not user_info:
-        raise McpError(
-            ErrorData(
-                code=INVALID_PARAMS.code,
-                message="Authentication required for news search"
-            )
-        )
+    try:
+        headers = get_http_headers()
+        user_info = validate_jwt_token(headers)
+        if not user_info:
+            return {
+                "error": "Authentication required for news search",
+                "query": query
+            }
+    except Exception as e:
+        logger.error(f"Error accessing request headers: {e}")
+        return {
+            "error": f"Request header error: {str(e)}",
+            "query": query
+        }
 
     logger.info(f"News search from user {user_info.get('email', 'unknown')} for query: {query}")
 
@@ -214,7 +226,7 @@ async def search_news(context: Context, query: str) -> Dict[str, Any]:
         )
 
 @server.tool()
-async def health_check(context: Context) -> Dict[str, Any]:
+async def health_check() -> Dict[str, Any]:
     """
     Health check endpoint for monitoring server status.
 
@@ -227,6 +239,21 @@ async def health_check(context: Context) -> Dict[str, Any]:
         "version": "1.0.0",
         "timestamp": datetime.now().isoformat(),
         "tools_available": ["get_weather", "search_news", "health_check"]
+    }
+
+@server.tool()
+async def simple_test() -> Dict[str, Any]:
+    """
+    Simple test tool without authentication for debugging.
+
+    Returns:
+        Simple success message
+    """
+    logger.info("Simple test tool called - no authentication required")
+    return {
+        "status": "success",
+        "message": "Simple test tool working",
+        "timestamp": datetime.now().isoformat()
     }
 
 def main():

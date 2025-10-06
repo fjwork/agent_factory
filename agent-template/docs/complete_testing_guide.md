@@ -49,11 +49,10 @@ cd /path/to/agent_factory/example-mcp-server
 pip install -r requirements.txt
 
 # Start MCP server
-python server.py
+python mcp_server.py
 
-# Verify it's running
-curl http://localhost:8080/health
-# Should return: {"status": "healthy", "service": "MCP Server"}
+# Verify it's running (MCP server uses protocol-level communication)
+lsof -i :8080
 ```
 
 **Expected Output:**

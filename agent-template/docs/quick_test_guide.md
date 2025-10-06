@@ -37,16 +37,18 @@ python mcp_server.py
 INFO - Starting MCP Server...
 INFO - Available tools: get_weather, search_news, health_check
 INFO - MCP endpoint: http://localhost:8080/mcp
-INFO - Health check: http://localhost:8080/health
+INFO - Health check: Use MCP protocol
 INFO - Started server process...
 INFO - Uvicorn running on http://0.0.0.0:8080
 ```
 
 **✅ Verify MCP Server:**
 ```bash
-# Test health endpoint
-curl http://localhost:8080/health
-# Should return: {"status": "healthy", "service": "MCP Server", "endpoint": "/mcp"}
+# The MCP server uses MCP protocol, not REST endpoints
+# Verify it's running by checking the process
+ps aux | grep mcp_server
+# Or check if port 8080 is listening
+lsof -i :8080
 ```
 
 ### Step 2: Start Remote Agent (Terminal 2)
@@ -249,6 +251,31 @@ curl -X POST http://localhost:8001/ \
 
 **✅ Expected Result:** Should execute the bearer token tool and display information about the authentication context being forwarded.
 
+### Test 5: Simple Test Tool (No Authentication)
+
+```bash
+# Test simple MCP tool without authentication (basic connectivity test)
+curl -X POST http://localhost:8001/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "test-simple-1",
+    "method": "message/send",
+    "params": {
+      "context_id": "test-simple-1",
+      "message": {
+        "messageId": "simple-test",
+        "role": "user",
+        "parts": [{
+          "text": "Run simple test tool"
+        }]
+      }
+    }
+  }'
+```
+
+**✅ Expected Result:** Should successfully execute the simple_test tool and return a success message, proving basic MCP connectivity works.
+
 ## 🔍 What to Look For
 
 ### In Main Agent Logs (Terminal 3):
@@ -269,9 +296,10 @@ curl -X POST http://localhost:8001/ \
 
 ### In MCP Server Logs (Terminal 1):
 ```
-✅ GET /mcp/tools requests
-✅ POST /mcp/call requests
-✅ Authentication header processing (may fail without JWT)
+✅ MCP session establishment
+✅ Tools list requests (tools/list)
+✅ Tool call requests (tools/call)
+✅ JWT authentication processing and user identification
 ```
 
 ## 🎯 Success Indicators
@@ -279,7 +307,7 @@ curl -X POST http://localhost:8001/ \
 ### ✅ **All Services Running**
 - Main Agent: http://localhost:8001/health
 - Remote Agent: http://localhost:8002/health
-- MCP Server: http://localhost:8080/health
+- MCP Server: Running on port 8080 (check with `lsof -i :8080`)
 
 ### ✅ **Tool Discovery Working**
 - Main agent logs show "Loaded X tools from registry"
@@ -317,9 +345,10 @@ curl http://localhost:8002/.well-known/agent-card.json
 
 ### Issue: "MCP connection failed"
 ```bash
-# Check MCP server directly
-curl http://localhost:8080/mcp/tools
-# May return 401 (auth error) - that's expected without proper JWT
+# Check MCP server is running
+lsof -i :8080
+# MCP server uses protocol-level communication, not REST endpoints
+# Connection issues usually mean server isn't running or port conflicts
 ```
 
 ### Issue: "JWT authentication failed"

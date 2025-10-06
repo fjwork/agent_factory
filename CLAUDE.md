@@ -56,7 +56,7 @@ cd agent-template/
 ```bash
 # Start MCP server (Terminal 1)
 cd example-mcp-server/
-python server.py
+python mcp_server.py
 
 # Start agent with MCP toolkit (Terminal 2)
 cd agent-template/

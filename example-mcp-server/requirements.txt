@@ -3,3 +3,4 @@ PyJWT>=2.8.0
 uvicorn[standard]
 python-dotenv>=1.0.0
 requests>=2.32.4
+fastmcp

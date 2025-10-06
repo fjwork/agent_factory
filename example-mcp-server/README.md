@@ -45,6 +45,7 @@ The proper MCP server uses JSON-RPC over HTTP with streaming support at `/mcp` e
 - `get_weather(location: str)` - Get weather data for a location
 - `search_news(query: str)` - Search for news articles
 - `health_check()` - Server health status
+- `simple_test()` - Simple test tool without authentication
 
 ## Running the Proper MCP Server
 
@@ -57,7 +58,7 @@ python mcp_server.py
 
 # Server will start on http://localhost:8080
 # MCP endpoint: http://localhost:8080/mcp
-# Health check: http://localhost:8080/health
+# Health check: Use MCP protocol to call health_check tool
 ```
 
 ## Legacy REST Server (server.py)
@@ -100,7 +101,10 @@ python mcp_server.py
 
 ### Step 2: Test MCP Server Health
 ```bash
-curl http://localhost:8080/health
+# The MCP server doesn't have a REST health endpoint
+# Health checking is done via MCP protocol using the health_check tool
+# You can test basic connectivity by checking if the server is running
+ps aux | grep mcp_server
 ```
 
 ### Step 3: Start Agent and Test
@@ -144,6 +148,10 @@ curl -X POST http://localhost:8001/ \
 - Server health and status information
 - No parameters required
 
+### simple_test()
+- Simple test tool without authentication for debugging
+- No parameters required
+
 ## Authentication
 
 This server validates JWT tokens sent by the ADK agent. The validation includes:
@@ -162,12 +170,13 @@ To add new tools to the MCP server:
 1. **Add a tool function** with the `@server.tool()` decorator:
 ```python
 @server.tool()
-async def my_custom_tool(context: Context, parameter: str) -> Dict[str, Any]:
+async def my_custom_tool(parameter: str) -> Dict[str, Any]:
     """Tool description here."""
     # Validate authentication
-    user_info = validate_jwt_token(context.meta.request)
+    headers = get_http_headers()
+    user_info = validate_jwt_token(headers)
     if not user_info:
-        raise McpError(ErrorData(code=INVALID_PARAMS.code, message="Auth required"))
+        return {"error": "Authentication required"}
 
     # Your tool logic here
     return {"result": "custom data"}
