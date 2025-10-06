@@ -5,7 +5,7 @@ This guide walks you through testing the complete agent-template setup step by s
 ## 🎯 What You'll Test
 
 ```
-Main Agent (8000) ──────────────→ Remote Agent (8001)
+Main Agent (8001) ──────────────→ Remote Agent (8002)
        │                         [auth_validation_tool]
        │
        └─────────────────────────→ MCP Server (8080)
@@ -26,23 +26,27 @@ Main Agent (8000) ──────────────→ Remote Agent (80
 cd /usr/local/google/home/flammoglia/aitests/agent_factory/example-mcp-server
 
 # Install dependencies if needed
-pip install Flask PyJWT requests python-dotenv
+pip install -r requirements.txt
 
-# Start MCP server
-python server.py
+# Start the proper MCP server (NOT the legacy server.py)
+python mcp_server.py
 ```
 
 **✅ Expected Output:**
 ```
-* Running on http://0.0.0.0:8080
-* Debug mode: on
+INFO - Starting MCP Server...
+INFO - Available tools: get_weather, search_news, health_check
+INFO - MCP endpoint: http://localhost:8080/mcp
+INFO - Health check: http://localhost:8080/health
+INFO - Started server process...
+INFO - Uvicorn running on http://0.0.0.0:8080
 ```
 
 **✅ Verify MCP Server:**
 ```bash
 # Test health endpoint
 curl http://localhost:8080/health
-# Should return: {"status": "healthy", "service": "MCP Server"}
+# Should return: {"status": "healthy", "service": "MCP Server", "endpoint": "/mcp"}
 ```
 
 ### Step 2: Start Remote Agent (Terminal 2)
@@ -56,7 +60,7 @@ cat > .env << 'EOF'
 AGENT_NAME=RemoteAgentSample
 ENVIRONMENT=development
 A2A_HOST=0.0.0.0
-A2A_PORT=8001
+A2A_PORT=8002
 LOG_LEVEL=INFO
 EOF
 
@@ -67,14 +71,14 @@ python src/agent.py
 **✅ Expected Output:**
 ```
 INFO - Creating agent: RemoteAgentSample (env: development)
-INFO - 🚀 Starting server at http://0.0.0.0:8001
-INFO - 📋 Agent Card: http://0.0.0.0:8001/.well-known/agent-card.json
+INFO - 🚀 Starting server at http://0.0.0.0:8002
+INFO - 📋 Agent Card: http://0.0.0.0:8002/.well-known/agent-card.json
 ```
 
 **✅ Verify Remote Agent:**
 ```bash
 # Test health endpoint
-curl http://localhost:8001/health
+curl http://localhost:8002/health
 # Should return: {"status": "healthy"}
 ```
 
@@ -89,7 +93,7 @@ cat > .env << 'EOF'
 AGENT_NAME=MainAgent
 ENVIRONMENT=development
 A2A_HOST=0.0.0.0
-A2A_PORT=8000
+A2A_PORT=8001
 LOG_LEVEL=INFO
 
 # MCP Configuration
@@ -102,7 +106,7 @@ EOF
 cat > config/remote_agents.yaml << 'EOF'
 remote_agents:
   - name: "remote_agent_sample"
-    url: "http://localhost:8001"
+    url: "http://localhost:8002"
     description: "Sample remote agent for testing authentication forwarding"
     capabilities:
       - "authentication_validation"
@@ -127,17 +131,17 @@ INFO -    - 3 traditional authenticated tools
 INFO -    - 1 MCP toolsets
 INFO - ✅ Agent has 1 remote sub-agents:
 INFO -    - remote_agent_sample: Sample remote agent for testing authentication forwarding
-INFO - 🚀 Starting server at http://0.0.0.0:8000
+INFO - 🚀 Starting server at http://0.0.0.0:8001
 ```
 
 **✅ Verify Main Agent:**
 ```bash
 # Test health endpoint
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 # Should return: {"status": "healthy"}
 
 # Check agent card
-curl http://localhost:8000/.well-known/agent-card.json
+curl http://localhost:8001/.well-known/agent-card.json
 ```
 
 ## 🧪 Run Tests
@@ -146,57 +150,104 @@ curl http://localhost:8000/.well-known/agent-card.json
 
 ```bash
 # Test profile tool (will require authentication)
-curl -X POST http://localhost:8000/a2a/message/send \
+curl -X POST http://localhost:8001/ \
   -H "Content-Type: application/json" \
   -d '{
-    "context_id": "test-profile-1",
-    "content": "Get my user profile information"
+    "jsonrpc": "2.0",
+    "id": "test-profile-1",
+    "method": "message/send",
+    "params": {
+      "context_id": "test-profile-1",
+      "message": {
+        "messageId": "profile-test",
+        "role": "user",
+        "parts": [{
+          "text": "Get my user profile information"
+        }]
+      }
+    }
   }'
 ```
 
 **✅ Expected Result:** Should return authentication required message since no OAuth setup yet.
 
-### Test 2: MCP Weather Tool
+### Test 2: MCP Weather Tool (with Bearer Token)
 
 ```bash
-# Test MCP weather tool
-curl -X POST http://localhost:8000/a2a/message/send \
+# Test MCP weather tool with bearer token
+curl -X POST http://localhost:8001/ \
+  -H "Authorization: Bearer test-token-123" \
   -H "Content-Type: application/json" \
   -d '{
-    "context_id": "test-weather-1",
-    "content": "Get weather for San Francisco"
+    "jsonrpc": "2.0",
+    "id": "test-weather-1",
+    "method": "message/send",
+    "params": {
+      "context_id": "test-weather-1",
+      "message": {
+        "messageId": "weather-test",
+        "role": "user",
+        "parts": [{
+          "text": "Get weather for San Francisco"
+        }]
+      }
+    }
   }'
 ```
 
-**✅ Expected Result:** Should attempt to connect to MCP server. May show JWT auth errors (expected without proper GCP setup).
+**✅ Expected Result:** Should attempt to connect to MCP server and forward the bearer token. May show JWT auth errors (expected without proper GCP setup), but auth context should be passed through.
 
-### Test 3: Remote Agent Delegation
+### Test 3: Remote Agent Delegation (with Bearer Token)
 
 ```bash
-# Test remote agent delegation
-curl -X POST http://localhost:8000/a2a/message/send \
+# Test remote agent delegation with bearer token for authentication forwarding
+curl -X POST http://localhost:8001/ \
+  -H "Authorization: Bearer test-token-123" \
   -H "Content-Type: application/json" \
   -d '{
-    "context_id": "test-remote-1",
-    "content": "Validate authentication using the remote agent"
+    "jsonrpc": "2.0",
+    "id": "test-remote-1",
+    "method": "message/send",
+    "params": {
+      "context_id": "test-remote-1",
+      "message": {
+        "messageId": "remote-test",
+        "role": "user",
+        "parts": [{
+          "text": "Validate authentication using the remote agent"
+        }]
+      }
+    }
   }'
 ```
 
-**✅ Expected Result:** Should delegate to remote agent and return authentication validation results.
+**✅ Expected Result:** Should delegate to remote agent with the bearer token forwarded. The remote agent should receive and validate the authentication context.
 
-### Test 4: Bearer Token Tool
+### Test 4: Bearer Token Tool (with Bearer Token)
 
 ```bash
-# Test bearer token printing tool
-curl -X POST http://localhost:8000/a2a/message/send \
+# Test bearer token printing tool with authentication
+curl -X POST http://localhost:8001/ \
+  -H "Authorization: Bearer test-token-123" \
   -H "Content-Type: application/json" \
   -d '{
-    "context_id": "test-token-1",
-    "content": "Print bearer token information"
+    "jsonrpc": "2.0",
+    "id": "test-token-1",
+    "method": "message/send",
+    "params": {
+      "context_id": "test-token-1",
+      "message": {
+        "messageId": "token-test",
+        "role": "user",
+        "parts": [{
+          "text": "Print bearer token information"
+        }]
+      }
+    }
   }'
 ```
 
-**✅ Expected Result:** Should return bearer token analysis and forwarding status.
+**✅ Expected Result:** Should execute the bearer token tool and display information about the authentication context being forwarded.
 
 ## 🔍 What to Look For
 
@@ -226,8 +277,8 @@ curl -X POST http://localhost:8000/a2a/message/send \
 ## 🎯 Success Indicators
 
 ### ✅ **All Services Running**
-- Main Agent: http://localhost:8000/health
-- Remote Agent: http://localhost:8001/health
+- Main Agent: http://localhost:8001/health
+- Remote Agent: http://localhost:8002/health
 - MCP Server: http://localhost:8080/health
 
 ### ✅ **Tool Discovery Working**
@@ -250,8 +301,8 @@ curl -X POST http://localhost:8000/a2a/message/send \
 ### Issue: "Port already in use"
 ```bash
 # Kill processes on ports
-sudo lsof -ti:8000 | xargs kill -9
 sudo lsof -ti:8001 | xargs kill -9
+sudo lsof -ti:8002 | xargs kill -9
 sudo lsof -ti:8080 | xargs kill -9
 ```
 
@@ -261,7 +312,7 @@ sudo lsof -ti:8080 | xargs kill -9
 cat config/remote_agents.yaml
 
 # Check remote agent is running
-curl http://localhost:8001/.well-known/agent-card.json
+curl http://localhost:8002/.well-known/agent-card.json
 ```
 
 ### Issue: "MCP connection failed"

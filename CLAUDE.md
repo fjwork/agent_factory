@@ -4,12 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This is an **Agent Factory** - a comprehensive toolkit for creating Google ADK (Agent Development Kit) agents with OAuth authentication and Agent-to-Agent (A2A) protocol support. The repository uses a template-based approach for creating new agents with standardized authentication and communication patterns.
+This is an **Agent Factory** - a comprehensive toolkit for creating Google ADK (Agent Development Kit) agents with OAuth authentication, MCP (Model Context Protocol) integration, and Agent-to-Agent (A2A) protocol support. The repository uses a template-based approach for creating new agents with standardized authentication, tool registry, and communication patterns.
 
 ## Key Directory Structure
 
-- `agent-template/` - Production-ready template for new ADK agents with OAuth + A2A
+- `agent-template/` - Production-ready template for new ADK agents with OAuth + A2A + MCP
 - `agents/` - Live agent instances created from the template
+- `simplified-template/` - Lightweight template with basic authentication forwarding
+- `example-mcp-server/` - Example MCP server for testing MCP toolkit integration
 - `docs/` - Documentation and configuration templates
 - `.claude/` - Claude Code workspace configuration
 
@@ -18,27 +20,46 @@ This is an **Agent Factory** - a comprehensive toolkit for creating Google ADK (
 ### Running Agents
 
 ```bash
-# Run an agent from template
+# Run main agent from template (port 8000)
 cd agent-template/
 python src/agent.py
 
-# Run a specific agent instance
+# Run specific agent instance (port 8001)
 cd agents/remote-agent-sample/
 python src/agent.py
 
 # Run with custom environment
 ENVIRONMENT=development python src/agent.py
+
+# Run with debug logging
+LOG_LEVEL=DEBUG python src/agent.py
 ```
 
-### Testing
+### Testing Multi-Agent Setup
 
 ```bash
-# Test multi-agent authentication forwarding
+# Start remote agent first (Terminal 1)
+cd agents/remote-agent-sample/
+python src/agent.py
+
+# Start main agent (Terminal 2)
+cd agent-template/
+python src/agent.py
+
+# Test authentication forwarding (Terminal 3)
 cd agent-template/
 ./testing_scripts/test_multiagent.sh
+```
 
-# Test specific agent
-cd agents/remote-agent-sample/
+### Testing MCP Integration
+
+```bash
+# Start MCP server (Terminal 1)
+cd example-mcp-server/
+python server.py
+
+# Start agent with MCP toolkit (Terminal 2)
+cd agent-template/
 python src/agent.py
 ```
 
@@ -49,32 +70,36 @@ python src/agent.py
 cd agent-template/
 pip install -r requirements.txt
 
-# Development dependencies (testing, type checking)
-pip install -r requirements-dev.txt
-
-# Run setup script for new agent
-./deployment/scripts/setup.sh --dev
-```
-
-### Type Checking and Quality
-
-```bash
-# Type checking
+# Type checking (no dedicated config file)
+cd agent-template/
 mypy src/
 
-# Testing
+# Testing (pytest available but no dedicated test files in template)
 pytest
 
-# Run with debug logging
-LOG_LEVEL=DEBUG python src/agent.py
+# Install development dependencies (included in main requirements.txt)
+pip install -r requirements.txt
 ```
 
 ## Architecture Overview
 
 ### Template-Based Agent Creation
-- All agents inherit from `agent-template/` with modular OAuth authentication
+- All agents inherit from `agent-template/` with OAuth authentication and tool registry
 - Template provides complete A2A server implementation with authentication forwarding
 - Agents support both standalone and multi-agent orchestration modes
+- Modular tool system with MCP toolkit integration for external tools
+
+### Tool Registry System
+- Centralized tool management via `config/tool_registry.yaml`
+- Environment-specific tool configurations (development/staging/production)
+- Automatic tool discovery and loading from registry
+- Native tools (built-in) and MCP toolkit tools (external) unified interface
+
+### MCP Toolkit Integration
+- Model Context Protocol support for external tools via HTTP
+- JWT token-based authentication for MCP servers
+- Automatic token refresh and caching
+- Google Cloud credential integration for JWT generation
 
 ### Authentication Flow
 - OAuth 2.0 with multiple providers (Google, Azure, Okta)
@@ -91,15 +116,20 @@ LOG_LEVEL=DEBUG python src/agent.py
 ### Configuration System
 - `config/agent_config.yaml` - Agent settings and capabilities
 - `config/oauth_config.yaml` - OAuth provider configuration
+- `config/tool_registry.yaml` - Tool configuration and environment settings
+- `config/mcp_toolsets.yaml` - MCP server and toolset configurations
+- `config/remote_agents.yaml` - Remote agent endpoints and authentication
 - `config/deployment_config.yaml` - Deployment settings
 - Environment-specific configuration via `.env` files
 
 ## Key Files and Patterns
 
 ### Main Agent Implementation
-- `src/agent.py` - Main entry point with OAuth + A2A server
+- `src/agent.py` - Main entry point with OAuth + A2A server + tool registry
 - `src/auth/agent_auth_callback.py` - Authentication context injection
 - `src/tools/authenticated_tool.py` - Base class for OAuth-aware tools
+- `src/tools/tool_registry.py` - Tool registry system and configuration loading
+- `src/tools/mcp_toolkit.py` - MCP toolkit with JWT authentication
 
 ### Authentication System
 - `src/auth/auth_config.py` - OAuth configuration loading
@@ -109,6 +139,11 @@ LOG_LEVEL=DEBUG python src/agent.py
 ### A2A Communication
 - `src/agent_a2a/server.py` - A2A server with auth forwarding
 - `src/agent_factory/remote_agent_factory.py` - Remote agent management
+
+### Tool System
+- `src/tools/example_tool.py` - Native tool examples (ExampleTool, BearerTokenPrintTool)
+- `config/tool_registry.yaml` - Tool configuration and environment settings
+- `config/mcp_toolsets.yaml` - MCP server configurations and JWT settings
 
 ## Environment Configuration
 
@@ -127,15 +162,26 @@ OAuth credentials should be configured in `.env` files (never committed) or Goog
 1. Copy template: `cp -r agent-template/ my-new-agent/`
 2. Configure OAuth credentials in `.env`
 3. Customize `config/agent_config.yaml` for specific capabilities
-4. Implement custom tools inheriting from `AuthenticatedTool`
-5. Test with `python src/agent.py`
+4. Configure tools in `config/tool_registry.yaml` and `config/mcp_toolsets.yaml`
+5. Implement custom tools inheriting from `AuthenticatedTool`
+6. Test with `python src/agent.py`
 
 ## Multi-Agent Setup
 
-- Configure remote agents in YAML files under `docs/configurations/`
+- Configure remote agents in `config/remote_agents.yaml`
+- Use `docs/configurations/` templates for different deployment scenarios
 - Use `docs/multi_agent_setup.md` for orchestration patterns
 - Authentication context is automatically forwarded between agents
-- Test multi-agent flows with `test_multiagent.sh`
+- Test multi-agent flows with `./testing_scripts/test_multiagent.sh`
+
+## Testing Complete Setup
+
+For comprehensive testing including MCP integration:
+1. Follow `agent-template/docs/complete_testing_guide.md`
+2. Start MCP server: `cd example-mcp-server/ && python server.py`
+3. Start remote agent: `cd agents/remote-agent-sample/ && python src/agent.py`
+4. Start main agent: `cd agent-template/ && python src/agent.py`
+5. Test authentication forwarding: `./testing_scripts/test_multiagent.sh`
 
 ## Security Considerations
 

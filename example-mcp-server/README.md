@@ -1,144 +1,176 @@
 # Example MCP Server
 
-This is an example MCP server that demonstrates how to create the server-side component that works with the MCP toolkit integration in the agent template.
+This directory contains both a **legacy REST API server** and a **proper MCP server** that demonstrates how to create the server-side component that works with the MCP toolkit integration in the agent template.
 
 ## What This Is
 
-This is the **missing piece** - the actual MCP server that your ADK agent connects to using the `mcp_toolkit.py` I created in the agent template.
+This provides the **server-side component** - the actual MCP server that your ADK agent connects to using the `mcp_toolkit.py` in the agent template.
+
+## Server Options
+
+### 1. mcp_server.py (RECOMMENDED)
+**Proper MCP Protocol Implementation**
+- Uses FastMCP framework
+- Implements correct MCP protocol over HTTP
+- StreamableHTTP transport at `/mcp` endpoint
+- JWT authentication support
+- Compatible with Google ADK MCP toolkit
+
+### 2. server.py (LEGACY)
+**Simple REST API (for reference)**
+- Basic Flask REST endpoints
+- `/mcp/tools` and `/mcp/call` routes
+- **Note**: This does NOT work with MCP toolkit due to protocol mismatch
 
 ## Architecture
 
 ```
-┌─────────────────┐    HTTP/JWT     ┌─────────────────┐
-│   ADK Agent     │ ──────────────→ │   MCP Server    │
-│                 │                 │   (This Code)   │
-│ mcp_toolkit.py  │ ←────────────── │                 │
-│ (Client)        │    JSON Tools   │ server.py       │
-└─────────────────┘                 └─────────────────┘
+┌─────────────────┐    MCP Protocol     ┌─────────────────┐
+│   ADK Agent     │ ──────────────────→ │   MCP Server    │
+│                 │    (JSON-RPC/HTTP)  │   (FastMCP)     │
+│ mcp_toolkit.py  │ ←────────────────── │                 │
+│ (Client)        │    Streaming HTTP   │ mcp_server.py   │
+└─────────────────┘                     └─────────────────┘
 ```
 
-## Endpoints
+## MCP Protocol (mcp_server.py)
 
-### `GET /mcp/tools`
-Returns available tools to the ADK agent.
+The proper MCP server uses JSON-RPC over HTTP with streaming support at `/mcp` endpoint.
 
-**Headers Required:**
-- `X-Serverless-Authorization: Bearer <jwt-token>`
+**Authentication:**
+- JWT tokens in `X-Serverless-Authorization` header
+- Automatic validation for all tool calls
 
-**Response:**
-```json
-{
-  "tools": [
-    {
-      "name": "get_weather",
-      "description": "Get current weather for a location",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "location": {"type": "string"}
-        }
-      }
-    }
-  ]
-}
-```
+**Available Tools:**
+- `get_weather(location: str)` - Get weather data for a location
+- `search_news(query: str)` - Search for news articles
+- `health_check()` - Server health status
 
-### `POST /mcp/call`
-Executes a tool with parameters.
-
-**Headers Required:**
-- `X-Serverless-Authorization: Bearer <jwt-token>`
-
-**Request Body:**
-```json
-{
-  "tool": "get_weather",
-  "parameters": {
-    "location": "San Francisco"
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "result": {
-    "location": "San Francisco",
-    "temperature": "72°F",
-    "condition": "Sunny"
-  }
-}
-```
-
-## Running the Server
+## Running the Proper MCP Server
 
 ```bash
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the server
-python server.py
+# Run the MCP server (RECOMMENDED)
+python mcp_server.py
 
 # Server will start on http://localhost:8080
+# MCP endpoint: http://localhost:8080/mcp
+# Health check: http://localhost:8080/health
+```
+
+## Legacy REST Server (server.py)
+
+The legacy server provides REST endpoints but does NOT work with the MCP toolkit:
+
+```bash
+# Run legacy server (for reference only)
+python server.py
 ```
 
 ## Integration with ADK Agent
 
-1. **Start this MCP server** on port 8080
-2. **Configure your ADK agent** to connect to it:
-
+1. **Start the MCP server**:
 ```bash
-# In your agent environment
-export MCP_SERVER_URL=http://localhost:8080
+cd example-mcp-server/
+python mcp_server.py
 ```
 
-3. **Run your ADK agent** - it will automatically discover and use the tools from this server
+2. **Configure your ADK agent** with these environment variables:
+```bash
+# In agent-template/.env
+MCP_SERVER_URL=http://localhost:8080
+ENABLE_WEATHER_MCP=true
+```
+
+3. **Run your ADK agent** - it will automatically discover and use the tools from this server:
+```bash
+cd agent-template/
+python src/agent.py
+```
+
+## Testing the Complete Setup
+
+### Step 1: Start MCP Server
+```bash
+cd example-mcp-server/
+python mcp_server.py
+```
+
+### Step 2: Test MCP Server Health
+```bash
+curl http://localhost:8080/health
+```
+
+### Step 3: Start Agent and Test
+```bash
+# In another terminal
+cd agent-template/
+python src/agent.py
+
+# Test weather tool with authentication
+curl -X POST http://localhost:8001/ \
+  -H "Authorization: Bearer test-token-123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "test-weather-1",
+    "method": "message/send",
+    "params": {
+      "context_id": "test-weather-1",
+      "message": {
+        "messageId": "weather-test",
+        "role": "user",
+        "parts": [{
+          "text": "Get weather for San Francisco"
+        }]
+      }
+    }
+  }'
+```
 
 ## Available Tools
 
-### get_weather
-- **Description**: Get weather data for a location
-- **Parameters**: location (string)
-- **Example**: `{"location": "New York"}`
+### get_weather(location: str)
+- Get weather data for a location
+- Returns temperature, conditions, forecast
 
-### search_news
-- **Description**: Search for news articles
-- **Parameters**: query (string)
-- **Example**: `{"query": "AI technology"}`
+### search_news(query: str)
+- Search for news articles on a topic
+- Returns article summaries and sources
+
+### health_check()
+- Server health and status information
+- No parameters required
 
 ## Authentication
 
-This server validates JWT tokens sent by the ADK agent. In production, you should:
+This server validates JWT tokens sent by the ADK agent. The validation includes:
 
-1. Properly validate JWT signatures
-2. Check token expiration
-3. Verify issuer and audience
-4. Implement proper error handling
+1. Token extraction from headers
+2. JWT payload decoding (signature verification disabled for testing)
+3. User information extraction
+4. Request logging with user context
 
-## Extending
+In production, implement proper JWT signature validation and token expiration checks.
 
-To add your own tools:
+## Extending the MCP Server
 
-1. **Define the tool** in the `get_tools()` response
-2. **Implement the logic** in the `call_tool()` function
-3. **Add the handler function** (like `get_weather_data()`)
+To add new tools to the MCP server:
 
-Example:
+1. **Add a tool function** with the `@server.tool()` decorator:
 ```python
-# In get_tools()
-{
-    "name": "my_custom_tool",
-    "description": "My custom functionality",
-    "parameters": {...}
-}
+@server.tool()
+async def my_custom_tool(context: Context, parameter: str) -> Dict[str, Any]:
+    """Tool description here."""
+    # Validate authentication
+    user_info = validate_jwt_token(context.meta.request)
+    if not user_info:
+        raise McpError(ErrorData(code=INVALID_PARAMS.code, message="Auth required"))
 
-# In call_tool()
-elif tool_name == 'my_custom_tool':
-    result = my_custom_tool_handler(parameters)
-
-# Add the handler
-def my_custom_tool_handler(parameters):
-    # Your custom logic here
+    # Your tool logic here
     return {"result": "custom data"}
 ```
+
+2. **Restart the server** - FastMCP automatically discovers new tools
