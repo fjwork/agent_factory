@@ -68,6 +68,16 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
                     status_code=401
                 )
 
+            # 🎯 CAPTURE BEARER TOKEN IMMEDIATELY - before any callbacks run
+            # This ensures the token is available for tools/MCP/remote agents on the first request
+            bearer_token = request.headers.get("Authorization", "")
+            if bearer_token.startswith("Bearer "):
+                token_value = bearer_token.replace("Bearer ", "").strip()
+                if token_value:
+                    user_id = user_context.get("user_id", "default_user")
+                    self._store_bearer_token_in_global_registry(user_id, token_value, user_context)
+                    logger.info(f"🎯 Immediately captured bearer token for user: {user_id}")
+
             # Add user context to request
             request.state.user_context = user_context
 
@@ -483,6 +493,33 @@ class AuthenticatedRequestHandler(DefaultRequestHandler):
 
         except Exception as e:
             logger.error(f"Failed to store OAuth context in global registry: {e}")
+
+    def _store_bearer_token_in_global_registry(self, user_id: str, bearer_token: str, user_context: Dict[str, Any]) -> None:
+        """
+        Store bearer token in global registry immediately upon authentication.
+
+        This ensures the token is available for tools/MCP/remote agents on the first request,
+        solving the timing issue where callbacks run before the registry is populated.
+        """
+        try:
+            oauth_context = {
+                "oauth_user_id": user_context.get("user_id"),
+                "oauth_provider": user_context.get("provider", "bearer_token"),
+                "oauth_user_info": user_context.get("user_info", {}),
+                "oauth_token": bearer_token,  # Store the actual bearer token
+                "oauth_authenticated": True,
+                "auth_type": user_context.get("auth_type", "bearer")
+            }
+
+            # Store in the same module-level registry used by callbacks
+            if not hasattr(self.__class__, '_oauth_registry'):
+                self.__class__._oauth_registry = {}
+
+            self.__class__._oauth_registry[user_id] = oauth_context
+            logger.info(f"🎯 Stored bearer token in global registry for immediate access: {user_id}")
+
+        except Exception as e:
+            logger.error(f"💥 Failed to store bearer token in global registry: {e}")
 
     @classmethod
     def get_oauth_context(cls, user_id: str) -> Dict[str, Any]:

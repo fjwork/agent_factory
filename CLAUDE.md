@@ -61,6 +61,11 @@ python mcp_server.py
 # Start agent with MCP toolkit (Terminal 2)
 cd agent-template/
 python src/agent.py
+
+# Test MCP toolkit directly
+cd agent-template/
+curl -H "Authorization: Bearer test-token" http://localhost:8000/call_tool \
+  -d '{"name": "weather_tool", "arguments": {"location": "San Francisco"}}'
 ```
 
 ### Development Setup
@@ -246,6 +251,115 @@ Dual Authentication Validation ✅
 - **First request after restart**: May show `token_present: false` (global registry empty)
 - **Subsequent requests**: Show `token_present: true` with `token_value: "test-token-123"`
 - **Both JWT and bearer tokens**: Successfully validated by MCP server
+
+## ✅ RESOLVED: Bearer Token Authentication Timing Fix
+
+### Issue Resolution
+**FIXED** - Bearer token authentication now works correctly on the **first request** for all systems:
+- ✅ **Remote Agent Authentication** - A2A communication with sub-agents
+- ✅ **MCP Bearer Token Passthrough** - Model Context Protocol tools
+- ✅ **Native Tool Authentication** - ADK-based tools via ToolContext
+
+### What Was Fixed
+
+**Root Cause:** The `before_agent_callback` was trying to retrieve bearer tokens from a global registry that was only populated **after** the callback had already executed.
+
+**Solution:** Modified `AuthenticatedRequestHandler.handle_post()` to capture and store bearer tokens **immediately** after authentication succeeds, before any callbacks run.
+
+### Technical Implementation
+
+**Files Modified:**
+- `src/agent_a2a/handlers.py` (lines 71-79, 497-522)
+
+**Key Changes:**
+1. **Immediate Token Capture** - Extract bearer token right after authentication
+2. **Global Registry Population** - Store token before callbacks execute
+3. **Preserved Architecture** - Uses existing global registry pattern
+
+**Code Location (`src/agent_a2a/handlers.py:71-79`):**
+```python
+# 🎯 CAPTURE BEARER TOKEN IMMEDIATELY - before any callbacks run
+bearer_token = request.headers.get("Authorization", "")
+if bearer_token.startswith("Bearer "):
+    token_value = bearer_token.replace("Bearer ", "").strip()
+    if token_value:
+        user_id = user_context.get("user_id", "default_user")
+        self._store_bearer_token_in_global_registry(user_id, token_value, user_context)
+```
+
+### Fixed Authentication Flow
+
+**Before (Broken):**
+```
+1. Request → before_agent_callback → Registry EMPTY → Auth fails
+2. Request processed → Registry populated → Too late
+```
+
+**After (Working):**
+```
+1. Request → Auth succeeds → Token stored immediately
+2. before_agent_callback → Registry has token → Auth works ✅
+```
+
+### Testing Commands
+
+**Remote Agent Authentication:**
+```bash
+curl -X POST http://localhost:8001/ \
+  -H "Authorization: Bearer test-token-123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "test-remote-1",
+    "method": "message/send",
+    "params": {
+      "context_id": "test-remote-1",
+      "message": {
+        "messageId": "remote-test",
+        "role": "user",
+        "parts": [{"text": "Validate authentication using the remote agent"}]
+      }
+    }
+  }'
+```
+
+**MCP Toolkit Authentication:**
+```bash
+curl -X POST http://localhost:8000/ \
+  -H "Authorization: Bearer test-token-123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "test-mcp-1",
+    "method": "message/send",
+    "params": {
+      "context_id": "test-mcp-1",
+      "message": {
+        "messageId": "mcp-test",
+        "role": "user",
+        "parts": [{"text": "Use the weather tool to get weather for San Francisco"}]
+      }
+    }
+  }'
+```
+
+Both commands now work on the **first request**.
+
+### Integration Points
+
+The fix maintains compatibility with all existing authentication systems:
+
+1. **Remote Agent Authentication** (`src/auth/agent_auth_callback.py`)
+   - Uses `_extract_auth_from_global_registry()`
+   - Now finds tokens immediately on first request
+
+2. **MCP Toolkit** (`src/tools/mcp_toolkit.py`)
+   - Uses `_get_bearer_token_from_registry()` for header injection
+   - Both initialization-time and callback-time injection work
+
+3. **Native Tools** (via ADK ToolContext)
+   - Session state populated via `_store_oauth_in_session_state()`
+   - Global registry serves as backup source
 
 ### Key Locations
 - **MCP Toolkit**: `src/tools/mcp_toolkit.py` (bearer token injection at line 109)
